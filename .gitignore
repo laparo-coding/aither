@@ -33,6 +33,7 @@ python-env/
 
 # IDE
 .vscode/
+!.vscode/mcp.json
 .idea/
 *.swp
 *.swo

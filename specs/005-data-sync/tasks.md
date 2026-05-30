@@ -31,7 +31,7 @@
 
 - [ ] T001 Add ServiceParticipantSchema, ServiceCourseDetailSchema, and ServiceCourseDetailResponseSchema Zod schemas with z.infer type exports in src/lib/hemera/schemas.ts
 - [ ] T002 [P] Add NextCourseSyncData and DataSyncJob interfaces in src/lib/sync/types.ts
-- [ ] T003 [P] Create src/templates/ directory and add course-detail.hbs Handlebars template with Kursdetails (key-value rows) and Teilnehmer & Vorbereitungen (columnar table, dash placeholders for null, word-break for long text) in src/templates/course-detail.hbs
+- [ ] T003 [P] Create src/templates/ directory and add `course-detail.hbs` Handlebars template with Course Details (key-value rows) and Participants & Preparations (columnar table, dash placeholders for null, word-break for long text) in `src/templates/course-detail.hbs`
 - [ ] T004 [P] Create output/courses/ directory and verify .gitignore covers output/**
 
 **Checkpoint**: Schemas, types, and template ready. All downstream phases can reference these.
@@ -100,20 +100,20 @@
 
 ## Phase 5: US5 — Display Synced Data on Homepage (P1)
 
-**Goal**: The Aither homepage at `/` server-renders the next upcoming course and its participants in two HTML tables (Kursdetails + Teilnehmer & Vorbereitungen) via live SSR from HemeraClient. Not from output/ files.
+**Goal**: The Aither homepage at `/` server-renders the next upcoming course and its participants in two HTML tables (Course Details + Participants & Preparations) via live SSR from `HemeraClient`, not from `output/` files.
 
-**Independent Test**: Load `http://localhost:3500` → verify Kursdetails table and Teilnehmer table with preparation columns are rendered, null fields show "–".
+**Independent Test**: Load `http://localhost:3500` → verify the Course Details table and Participants table with preparation columns are rendered, and null fields show `–`.
 
 ### Tests for US5
 
-- [ ] T020 [P] [US5] Write E2E test for homepage: verify Kursdetails table (Kurs, Level, Startdatum, Enddatum, Teilnehmerzahl) and Teilnehmer table (Name, Vorbereitungsabsicht, Gewünschte Ergebnisse, Vorgesetzten-Profil, Vorbereitung abgeschlossen) render with data, null fields show "–", fallback message when API unreachable in tests/e2e/sync-homepage.spec.ts
+- [ ] T020 [P] [US5] Write E2E test for homepage: verify the Course Details table (Course, Level, Start Date, End Date, Participant Count) and Participants table (Name, Preparation Intent, Desired Results, Line Manager Profile, Preparation Completed) render with data, null fields show `–`, and the fallback message appears when the API is unreachable in `tests/e2e/sync-homepage.spec.ts`
 
 ### Implementation for US5
 
 - [ ] T021 [US5] Refactor page.tsx to fetch courses via HemeraClient, call selectNextCourse(), then fetch course detail with participants in src/app/page.tsx
-- [ ] T022 [US5] Implement Kursdetails table (MUI Table) with key-value rows: Kurs, Level, Startdatum, Enddatum, Teilnehmerzahl in src/app/page.tsx
-- [ ] T023 [US5] Implement Teilnehmer & Vorbereitungen table (MUI Table) with columns: Name, Vorbereitungsabsicht, Gewünschte Ergebnisse, Vorgesetzten-Profil, Vorbereitung abgeschlossen (boolean derived from preparationCompletedAt). Null fields render as "–". Long text uses word-break: break-word in src/app/page.tsx
-- [ ] T024 [US5] Add error boundary / fallback UI: show "Kursdaten konnten nicht geladen werden" when HemeraClient fails, with try/catch wrapping the fetch logic in src/app/page.tsx
+- [ ] T022 [US5] Implement the Course Details table (MUI Table) with key-value rows: Course, Level, Start Date, End Date, Participant Count in `src/app/page.tsx`
+- [ ] T023 [US5] Implement the Participants & Preparations table (MUI Table) with columns: Name, Preparation Intent, Desired Results, Line Manager Profile, Preparation Completed (boolean derived from `preparationCompletedAt`). Null fields render as `–`. Long text uses `word-break: break-word` in `src/app/page.tsx`
+- [ ] T024 [US5] Add error boundary / fallback UI: show `Course data could not be loaded` when `HemeraClient` fails, with `try/catch` wrapping the fetch logic in `src/app/page.tsx`
 - [ ] T025 [US5] Run E2E test (T020) and verify pass (GREEN)
 
 **Checkpoint**: Homepage displays course + participant tables live from Hemera. Fallback works when API is down.

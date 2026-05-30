@@ -41,8 +41,9 @@ const isTestMode =
 	typeof process.env.JEST_WORKER_ID !== "undefined";
 const isNodeRuntime = process.env.NEXT_RUNTIME !== "edge" && typeof window === "undefined";
 const isDevelopment = process.env.NODE_ENV === "development";
-const isExplicitlyDisabled =
-	process.env.NEXT_PUBLIC_ROLLBAR_ENABLED === "0" || process.env.ROLLBAR_ENABLED === "0";
+const isServerExplicitlyDisabled = process.env.ROLLBAR_ENABLED === "0";
+const isClientExplicitlyDisabled =
+	process.env.NEXT_PUBLIC_ROLLBAR_ENABLED === "0" || isServerExplicitlyDisabled;
 const rollbarServerRoot = process.env.ROLLBAR_SERVER_ROOT;
 const clientRollbarToken = process.env.NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN;
 
@@ -145,6 +146,15 @@ interface ServerRootOptions {
 	getCwd?: () => string;
 }
 
+function readProcessCwdSafe(): string {
+	const maybeProcess = (globalThis as { process?: { cwd?: () => string } }).process;
+	if (typeof maybeProcess?.cwd !== "function") {
+		return "";
+	}
+
+	return maybeProcess.cwd();
+}
+
 export function isClientRollbarEnabled({
 	isNodeRuntime,
 	isTestMode,
@@ -167,7 +177,7 @@ const clientRollbarEnabled = isClientRollbarEnabled({
 	isNodeRuntime,
 	isTestMode,
 	isE2EMode,
-	isExplicitlyDisabled,
+	isExplicitlyDisabled: isClientExplicitlyDisabled,
 	publicEnabled: isExplicitlyEnabled("NEXT_PUBLIC_ROLLBAR_ENABLED"),
 	clientToken: clientRollbarToken,
 });
@@ -175,7 +185,7 @@ const clientRollbarEnabled = isClientRollbarEnabled({
 export function resolveServerRoot({
 	isNodeRuntime,
 	configuredRoot,
-	getCwd = () => process.cwd(),
+	getCwd = readProcessCwdSafe,
 }: ServerRootOptions): string | undefined {
 	if (!isNodeRuntime) {
 		return undefined;
@@ -186,7 +196,8 @@ export function resolveServerRoot({
 	}
 
 	try {
-		return getCwd();
+		const cwd = getCwd().trim();
+		return cwd || undefined;
 	} catch {
 		return undefined;
 	}
@@ -213,9 +224,9 @@ const baseConfig = {
 	captureUncaught: !isDevelopment,
 	captureUnhandledRejections: !isDevelopment,
 	environment: getRollbarEnvironment(),
-	// Disabled in E2E mode, test mode (via no-op instance), or when explicitly turned off
-	enabled: !isE2EMode && !isExplicitlyDisabled,
 };
+
+const serverRollbarEnabled = !isE2EMode && !isServerExplicitlyDisabled;
 
 // Client-side configuration (for future React components)
 export const clientConfig = {
@@ -236,6 +247,7 @@ export const serverInstance: Rollbar | RollbarTestInstance =
 		: new Rollbar({
 				accessToken: isE2EMode ? "dummy-token-for-e2e" : process.env.ROLLBAR_SERVER_TOKEN,
 				...baseConfig,
+				enabled: serverRollbarEnabled,
 				payload: {
 					server: { root: resolveServerRoot({ isNodeRuntime, configuredRoot: rollbarServerRoot }) },
 				},
@@ -260,6 +272,7 @@ export const clientInstance: Rollbar | RollbarTestInstance = !clientRollbarEnabl
 export const rollbarConfig = {
 	accessToken: process.env.ROLLBAR_SERVER_TOKEN,
 	...baseConfig,
+	enabled: serverRollbarEnabled,
 };
 
 export const rollbar = serverInstance;
@@ -315,7 +328,7 @@ export function reportError(
 	context?: ErrorContext,
 	severity: ErrorSeverityType = ErrorSeverity.ERROR,
 ): void {
-	if (!baseConfig.enabled) return;
+	if (!serverRollbarEnabled) return;
 
 	try {
 		const rateAll = readNumberEnv("ROLLBAR_SAMPLE_RATE_ALL", 1);
@@ -378,7 +391,7 @@ export function recordUserAction(
 	userId?: string,
 	metadata?: Record<string, unknown>,
 ): void {
-	if (!baseConfig.enabled) return;
+	if (!serverRollbarEnabled) return;
 	try {
 		const includePII = isTelemetryConsentGranted();
 		serverInstance.info(`User Action: ${action}`, {
@@ -399,7 +412,7 @@ export function recordUserAction(
 
 export function flushRollbar(): Promise<void> {
 	return new Promise((resolve) => {
-		if (!baseConfig.enabled) return resolve();
+		if (!serverRollbarEnabled) return resolve();
 		try {
 			serverInstance.wait(() => resolve());
 		} catch {

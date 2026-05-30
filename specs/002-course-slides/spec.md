@@ -197,15 +197,15 @@ All slides use a consistent base layout optimized for 1920×1080:
 All `{slugifiedTitle}` and `{slugifiedDescriptor}` values are derived using the following algorithm:
 
 1. Convert to lowercase
-2. Replace German special characters: `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss` (explicit pre-mapping before normalization)
+2. Replace locale-specific characters using the transliterations `ae`, `oe`, `ue`, and `ss` (explicit pre-mapping before normalization)
 3. Unicode NFD normalize, then strip remaining combining marks (handles other diacritics, e.g., é→e, ñ→n)
 4. Replace non-alphanumeric characters with hyphens
 5. Collapse consecutive hyphens to a single hyphen
 6. Trim leading/trailing hyphens
 
-Note: Step 2 is required because NFD decomposition of umlauts strips the diacritic (ä→a) rather than producing the German transliteration (ä→ae). The ß character has no NFD decomposition at all.
+Note: Step 2 is required because NFD decomposition of precomposed umlaut letters strips the diacritic and degrades them to plain vowels instead of producing the intended transliteration. The German sharp-s also has no NFD decomposition.
 
-Example: "Einführung in TypeScript" → `einfuehrung-in-typescript`
+Example: "Introduction to TypeScript" → `introduction-to-typescript`
 
 ### Data Flow
 

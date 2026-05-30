@@ -4,8 +4,8 @@
 // Task: T012 [005-data-sync] — DataSyncJob envelope, runDataSync()
 // ---------------------------------------------------------------------------
 
-import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
+import { requireSyncAccess } from "@/lib/auth/sync-service-auth";
 import { loadConfig } from "@/lib/config";
 import { createHemeraClient } from "@/lib/hemera/factory";
 import { rollbar } from "@/lib/monitoring/rollbar-official";
@@ -112,7 +112,7 @@ export function _resetState() {
 
 export async function POST(_req: NextRequest) {
 	const authData = await getRouteAuth();
-	const authResult = requireAdmin(authData);
+	const authResult = requireSyncAccess(_req, authData);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
 	}
@@ -141,6 +141,35 @@ export async function POST(_req: NextRequest) {
 			);
 		}
 
+		let outputDir: string;
+		let client: Awaited<ReturnType<typeof createHemeraClient>>;
+		try {
+			const cfg = loadConfig();
+			outputDir = cfg.HTML_OUTPUT_DIR;
+			client = await createHemeraClient({
+				requestId,
+				route: "/api/sync",
+				method: "POST",
+			});
+		} catch (err) {
+			const errorObj = err instanceof Error ? err : new Error(String(err));
+			rollbar.error(errorObj, {
+				additionalData: { context: "sync_initialization" },
+			});
+
+			return NextResponse.json(
+				{
+					success: false,
+					error: {
+						code: "SYNC_INITIALIZATION_FAILED",
+						message: "Sync initialization failed",
+					},
+					meta: buildMeta(requestId),
+				},
+				{ status: 500 },
+			);
+		}
+
 		// Create sync job placeholder with DataSyncJob shape
 		const jobId = `sync-${Date.now()}`;
 		const startTime = new Date().toISOString();
@@ -159,12 +188,6 @@ export async function POST(_req: NextRequest) {
 		};
 		isSyncRunning = true;
 		syncStartedAt = Date.now();
-
-		// Fire-and-forget: start orchestrator async
-		const cfg = loadConfig();
-		const outputDir = cfg.HTML_OUTPUT_DIR;
-
-		const client = await createHemeraClient();
 		const orchestrator = new SyncOrchestrator({
 			client,
 			outputDir,
@@ -229,7 +252,7 @@ export async function POST(_req: NextRequest) {
 
 export async function GET(_req: NextRequest) {
 	const authData = await getRouteAuth();
-	const authResult = requireAdmin(authData);
+	const authResult = requireSyncAccess(_req, authData);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
 	}

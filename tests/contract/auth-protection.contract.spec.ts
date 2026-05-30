@@ -7,7 +7,7 @@ import { POST as recPOST } from "@/app/api/recordings/route";
 import { POST as syncPOST } from "@/app/api/sync/route";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock loadConfig
 vi.mock("@/lib/config", () => ({
@@ -60,6 +60,7 @@ vi.mock("@/lib/sync/recording-transmitter", () => ({
 }));
 
 const mockGetRouteAuth = vi.mocked(getRouteAuth);
+const originalAitherSyncToken = process.env.AITHER_SYNC_TOKEN;
 
 function createRequest(): NextRequest {
 	return new NextRequest(new URL("http://localhost:3500/api/sync"), { method: "POST" });
@@ -68,6 +69,16 @@ function createRequest(): NextRequest {
 describe("/api/sync and /api/recordings auth", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		process.env.AITHER_SYNC_TOKEN = "gaia-local-aither-sync-token-20260530";
+	});
+
+	afterEach(() => {
+		if (typeof originalAitherSyncToken === "string") {
+			process.env.AITHER_SYNC_TOKEN = originalAitherSyncToken;
+			return;
+		}
+
+		process.env.AITHER_SYNC_TOKEN = undefined;
 	});
 
 	it("POST /api/sync returns 401 for unauthenticated", async () => {
@@ -95,6 +106,30 @@ describe("/api/sync and /api/recordings auth", () => {
 		});
 		const res = await syncPOST(createRequest());
 		expect(res.status).toBe(202);
+	});
+
+	it("POST /api/sync returns 202 for a valid service bearer token", async () => {
+		mockGetRouteAuth.mockResolvedValue(null);
+		const req = new NextRequest(new URL("http://localhost:3500/api/sync"), {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer gaia-local-aither-sync-token-20260530",
+			},
+		});
+		const res = await syncPOST(req);
+		expect(res.status).toBe(202);
+	});
+
+	it("POST /api/sync returns 401 for an invalid service bearer token", async () => {
+		mockGetRouteAuth.mockResolvedValue(null);
+		const req = new NextRequest(new URL("http://localhost:3500/api/sync"), {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer invalid-token",
+			},
+		});
+		const res = await syncPOST(req);
+		expect(res.status).toBe(401);
 	});
 
 	it("POST /api/sync returns 403 for non-admin", async () => {

@@ -256,7 +256,7 @@ Retrieve HTML templates (seminar material).
       "id": "tpl-001",
       "seminarId": "sem-001",
       "lessonId": "les-001",
-      "markup": "<html><body><h1>{{seminarTitle}}</h1><p>Teilnehmer: {{participantName}}</p></body></html>",
+      "markup": "<html><body><h1>{{seminarTitle}}</h1><p>Participant: {{participantName}}</p></body></html>",
       "version": "2026-02-10T12:00:00Z"
     }
   ]

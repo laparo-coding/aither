@@ -109,7 +109,7 @@ flowchart TD
 Both `{title}` in `{NN}_{title}.html` (curriculum slides) and `{descriptor}` in `{NN}_{descriptor}.html` (material slides) follow the same slugification rules defined in the spec (see spec.md "Slugification Rules"):
 
 1. Convert to lowercase
-2. Replace German special characters: `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`
+2. Replace locale-specific characters using the transliterations `ae`, `oe`, `ue`, and `ss`
 3. Unicode NFD normalize, then strip remaining combining marks (e.g., `é→e`, `ñ→n`)
 4. Replace all filesystem-invalid and non-alphanumeric characters (`/ \ : * ? " < > |` and others) with hyphens
 5. Collapse consecutive hyphens to a single hyphen

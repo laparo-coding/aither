@@ -5,7 +5,7 @@
 **Status**: Draft  
 **Input**: Aither fetches course data from the Hemera Academy Service API and displays it on its homepage. This spec defines the full data sync pipeline: scheduled fetching, incremental updates, content-hash-based change detection, and HTML generation from templates.
 
-> **Kernregel**: Aither zieht ausschließlich Daten des **nächsten anstehenden Kurses** (nach Startdatum) sowie die **Teilnehmer und deren Vorbereitungen** für diesen Kurs. Vergangene und weiter in der Zukunft liegende Kurse werden ignoriert. Dadurch bleibt der Sync fokussiert und die generierte Ausgabe übersichtlich.
+> **Core rule**: Aither only pulls data for the **next upcoming course** (by start date) and the **participants plus their preparations** for that course. Past courses and courses farther in the future are ignored so the sync stays focused and the generated output remains easy to review.
 
 ## Pre-Requisites
 
@@ -101,8 +101,8 @@ As a visitor, I want to see the next upcoming Hemera Academy course and its part
 
 **Acceptance Scenarios**:
 
-1. **Given** the next course is synced, **When** the Aither homepage loads, **Then** a **Kursdetails** table is displayed with rows for: Kurs (title), Level, Startdatum, Enddatum, and Teilnehmerzahl.
-2. **Given** the next course has participants with preparations, **When** the homepage loads, **Then** a **Teilnehmer & Vorbereitungen** table is displayed with columns: Name, Vorbereitungsabsicht, Gewünschte Ergebnisse, Vorgesetzten-Profil, and Vorbereitung abgeschlossen.
+1. **Given** the next course is synced, **When** the Aither homepage loads, **Then** a **Course Details** table is displayed with rows for: Course (title), Level, Start Date, End Date, and Participant Count.
+2. **Given** the next course has participants with preparations, **When** the homepage loads, **Then** a **Participants & Preparations** table is displayed with columns: Name, Preparation Intent, Desired Results, Line Manager Profile, and Preparation Completed.
 3. **Given** a participant has not completed their preparation, **When** the table renders, **Then** empty fields show a dash ("–") placeholder instead of blank cells.
 4. **Given** the Hemera API is unreachable, **When** the homepage loads, **Then** a fallback message is shown instead of an error page.
 5. **Given** the next course changes in Hemera, **When** the page is reloaded after sync, **Then** both tables update to reflect the new course and its participants.
@@ -123,8 +123,8 @@ As a visitor, I want to see the next upcoming Hemera Academy course and its part
 7. **Sync Status** — `GET /api/sync` returns last sync time, result, the selected course, and participant count.
 8. **Concurrent Sync Guard** — Only one sync may run at a time; reject duplicates with 409.
 9. **Homepage Display** — Server-render the next upcoming course on the Aither homepage via `HemeraClient` **live at request time** (SSR, not from `output/` files). The `output/` directory serves the fullscreen HTML player only. The page must contain:
-   - **Kursdetails-Tabelle**: Title, Level, Startdatum, Enddatum, Teilnehmerzahl.
-   - **Teilnehmer-Tabelle**: Name, Vorbereitungsabsicht (`preparationIntent`), Gewünschte Ergebnisse (`desiredResults`), Vorgesetzten-Profil (`lineManagerProfile`), Vorbereitung abgeschlossen (`preparationCompletedAt`).
+  - **Course details table**: Title, Level, Start Date, End Date, Participant Count.
+  - **Participants table**: Name, Preparation Intent (`preparationIntent`), Desired Results (`desiredResults`), Line Manager Profile (`lineManagerProfile`), Preparation Completed (`preparationCompletedAt`).
    - Empty/null fields are displayed as "–" (dash).
 
 ### Non-Functional Requirements
@@ -133,35 +133,35 @@ As a visitor, I want to see the next upcoming Hemera Academy course and its part
 2. No local database (stateless architecture per Constitution VII).
 3. All API responses include structured error objects with request IDs.
 4. Sync failures are logged via Rollbar (when enabled). Additionally, every completed sync (success or failure) emits a structured Rollbar `info`-level log event containing: duration (ms), files generated, files skipped, participant count, selected course ID, and errors (if any).
-5. **Darstellung**: Alle Daten werden in sauberen HTML-Tabellen dargestellt. Tabellen müssen lesbar sein (Spaltenüberschriften, Rahmen/Padding, kein Layout-Bruch bei langen Texten wie `preparationIntent`). Lange Textfelder (>200 Zeichen) werden in der Tabelle mit `word-break: break-word` dargestellt.
+5. **Presentation**: All data is rendered in clean HTML tables. Tables must remain readable with clear column headers, borders/padding, and no layout breakage for long text such as `preparationIntent`. Long text fields (>200 characters) use `word-break: break-word` in the table.
 6. **Gitignore**: The sync manifest file (`output/.sync-manifest.json`) and all generated HTML files in `output/` are gitignored.
 
 ## Clarifications
 
 ### Session 2026-02-21
 
-- Q: Was passiert, wenn kein zukünftiger Kurs existiert? → A: Sync erfolgreich mit 0 Dateien, bestehende Output-Dateien bleiben erhalten, Status enthält Hinweis "no upcoming course".
-- Q: Lädt die Homepage Teilnehmer live per SSR oder aus output/? → A: Live per SSR via HemeraClient (immer aktuell, kein Sync nötig). Die Dateien im `output/`-Verzeichnis dienen dem Fullscreen-Player.
-- Q: Soll der Sync Metriken über den API-Response hinaus erfassen? → A: Ja, strukturiertes Log-Event pro Sync (Dauer, Dateien, Teilnehmeranzahl, Fehler) via Rollbar info-Level.
+- Q: What happens when no future course exists? → A: Sync succeeds with 0 files, existing output files remain in place, and the status includes the note `no upcoming course`.
+- Q: Does the homepage load participants live via SSR or from `output/`? → A: Live via SSR through `HemeraClient` so the data stays current without requiring sync. Files in the `output/` directory are used only by the fullscreen player.
+- Q: Should the sync capture metrics beyond the API response? → A: Yes, emit one structured Rollbar info-level log event per sync including duration, files, participant count, and errors.
 
 ### Baseline
 
-- **Nur der nächste Kurs**: Aither synchronisiert ausschließlich den chronologisch nächsten Kurs (frühestes `startDate` in der Zukunft). Vergangene Kurse und weiter entfernte zukünftige Kurse werden weder gespeichert noch angezeigt.
-- **Teilnehmer + Vorbereitungen**: Für den nächsten Kurs werden alle Teilnehmer (`CourseParticipation`) inklusive ihrer Vorbereitungsfelder gezogen. Die relevanten Felder aus Hemera sind:
-  - `preparationIntent` — Vorbereitungsabsicht des Teilnehmers (max. 2000 Zeichen)
-  - `desiredResults` — Gewünschte Ergebnisse (max. 2000 Zeichen)
-  - `lineManagerProfile` — Profil des Vorgesetzten (max. 2000 Zeichen)
-  - `preparationCompletedAt` — Zeitstempel der abgeschlossenen Vorbereitung (nullable)
+- **Only the next course**: Aither synchronizes only the chronologically next course (earliest future `startDate`). Past courses and more distant future courses are neither stored nor shown.
+- **Participants + preparations**: For the next course, fetch all participants (`CourseParticipation`) together with their preparation fields. The relevant Hemera fields are:
+  - `preparationIntent` — participant preparation intent (max. 2000 characters)
+  - `desiredResults` — desired results (max. 2000 characters)
+  - `lineManagerProfile` — line manager profile (max. 2000 characters)
+  - `preparationCompletedAt` — timestamp of completed preparation (nullable)
 - **No database**: Aither stores only generated HTML files and a sync manifest (JSON). All source data is fetched from Hemera on every sync.
 - **Cron is external**: Scheduling is handled by system cron (`crontab`) calling the sync API, not by an in-process scheduler.
 - **Templates**: HTML generation uses a local Handlebars template (`src/templates/course-detail.hbs`). Templates apply only to the sync pipeline (`output/`), not to the homepage (which uses React SSR).
-- **Tabellen-Layout**: Die HTML-Seite zeigt zwei Tabellen: (1) **Kursdetails** mit Metadaten des nächsten Kurses als Key-Value-Zeilen, (2) **Teilnehmer & Vorbereitungen** als spaltenbasierte Tabelle mit einer Zeile pro Teilnehmer. Leere Felder werden mit "–" dargestellt. Lange Textfelder brechen innerhalb ihrer Zelle um.
+- **Table layout**: The HTML page shows two tables: (1) **Course Details** with metadata for the next course as key-value rows, and (2) **Participants & Preparations** as a column-based table with one row per participant. Empty fields render as `–`. Long text wraps within its table cell.
 
 ## Assumptions
 
 - The Hemera Service API at `/api/service/courses` returns all courses with participant counts and `startDate` (confirmed working). Aither filters client-side to select only the next upcoming course.
 - `GET /api/service/participations/[id]` returns preparation fields (`preparationIntent`, `desiredResults`, `resultOutcome`, etc.) per Teilnahme-ID (confirmed in Hemera codebase).
-- **Fehlender Endpunkt**: Der ursprünglich angenommene `GET /api/service/courses/[id]/participations` Endpoint wird nicht benötigt. Stattdessen wird der bestehende `GET /api/service/courses/[id]` Endpoint in Hemera erweitert, um Teilnehmerdaten inkl. Vorbereitungsfelder direkt in der Kurs-Detail-Response einzubetten (siehe Pre-Requisites und research.md §2).
+- **Missing endpoint assumption resolved**: The originally assumed `GET /api/service/courses/[id]/participations` endpoint is not required. Instead, the existing `GET /api/service/courses/[id]` endpoint in Hemera is extended to embed participant data, including preparation fields, directly in the course detail response (see Pre-Requisites and research.md §2).
 - The `HemeraClient` with API key authentication is functional (confirmed in 003-service-user).
 - The `output/` directory is writable and gitignored.
 - FFmpeg or media processing is NOT part of this spec (see 004-recording-module).
@@ -171,7 +171,7 @@ As a visitor, I want to see the next upcoming Hemera Academy course and its part
 1. `POST /api/sync` fetches courses from Hemera, selects the next upcoming one, pulls all participants with their preparations, and generates HTML files in `output/`.
 2. Participant preparation data (`preparationIntent`, `desiredResults`, `lineManagerProfile`) is included in the generated output.
 3. Incremental sync skips regeneration when the next course's data (including participant preparations) is unchanged (verified by content hash comparison).
-4. Homepage at `/` displays the next upcoming course and its participants in well-formatted HTML tables (Kursdetails + Teilnehmer & Vorbereitungen).
+4. Homepage at `/` displays the next upcoming course and its participants in well-formatted HTML tables (Course Details + Participants & Preparations).
 5. Concurrent sync requests are rejected with 409.
 6. All sync operations are covered by unit and contract tests.
 7. When the next course changes (e.g., time passes), the output is updated accordingly on the next sync.

@@ -1,10 +1,10 @@
 # Aither Service User Setup Guide
 
-## Übersicht
+## Overview
 
-Aither kommuniziert mit der Hemera Academy API über einen dedizierten Service-User mit der Rolle `api-client`. Dieser Guide beschreibt die Einrichtung.
+Aither communicates with the Hemera Academy API through a dedicated service user with the `api-client` role. This guide describes the setup.
 
-## Architektur
+## Architecture
 
 ```
 Aither App (Server-Side)
@@ -17,21 +17,21 @@ Hemera API (/api/service/*)
     ↓
 Auth Middleware (getUserRole())
     ↓
-Service Endpoints (api-client oder admin)
+Service Endpoints (api-client or admin)
 ```
 
-## Schritt 1: Service-User in Clerk anlegen
+## Step 1: Create the Service User in Clerk
 
-1. **Clerk Dashboard öffnen**: https://dashboard.clerk.com
-2. **Zum Hemera-Projekt navigieren**
+1. **Open the Clerk dashboard**: https://dashboard.clerk.com
+2. **Navigate to the Hemera project**
 3. **Users → Create User**
-4. **User-Daten eingeben**:
+4. **Enter the user data**:
    - Email: `aither-service@hemera-academy.com`
-   - Password: Sicheres, generiertes Passwort (wird nicht für Login verwendet)
+  - Password: Secure generated password (not used for interactive login)
    - First Name: `Aither`
    - Last Name: `Service`
 
-5. **Public Metadata setzen**:
+5. **Set the public metadata**:
    ```json
    {
      "role": "api-client",
@@ -40,34 +40,30 @@ Service Endpoints (api-client oder admin)
    }
    ```
 
-6. **User ID notieren**: z.B. `user_2abc...`
+6. **Record the user ID**: e.g. `user_2abc...`
 
-## Schritt 2: Dienst-Zugangstoken / Service Credential
+## Step 2: Service Access Token / Service Credential
 
-Für Production empfehlen wir die Verwendung eines langlebigen Service-Credentials
-statt kurzlebiger Dashboard-Sessions. Dashboard-generierte Session-Tokens sind
-typischerweise kurzlebig (z. B. ~60m) und eignen sich nicht für unbeaufsichtigte
-Service-to-Service-Kommunikation.
+For production, we recommend using long-lived service credentials instead of short-lived dashboard sessions. Dashboard-generated session tokens are typically short-lived (for example ~60m) and are not suitable for unattended service-to-service communication.
 
-Für M2M-Auth verwenden wir einen statischen API-Key (nicht Clerk JWTs):
+For M2M auth we use a static API key, not Clerk JWTs:
 
 ```bash
-# API-Key generieren (48 Byte, base64url-kodiert)
+# Generate API key (48 bytes, base64url-encoded)
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-**Wichtig**: Rotieren und verwalten Sie diese Schlüssel über einen Secret
-Manager (Vercel/AWS/GCP) und vermeiden Sie das Committen in die Versionskontrolle.
+**Important**: Rotate and manage these keys through a secret manager (Vercel/AWS/GCP) and avoid committing them to version control.
 
-## Schritt 3: Environment Variables konfigurieren
+## Step 3: Configure Environment Variables
 
 ### In Hemera (.env.local)
 
 ```bash
-# API-Key für Service-Authentifizierung (muss mit Aither übereinstimmen)
+# API key for service authentication (must match Aither)
 HEMERA_SERVICE_API_KEY=<generierter-api-key>
 
-# Clerk User-ID des Service-Users (für Audit-Logging)
+# Clerk user ID of the service user (for audit logging)
 HEMERA_SERVICE_USER_ID=<clerk-user-id>
 ```
 
@@ -77,17 +73,17 @@ HEMERA_SERVICE_USER_ID=<clerk-user-id>
 # Hemera API Base URL
 HEMERA_API_BASE_URL=https://www.hemera.academy
 
-# API-Key für Hemera Service API (muss mit Hemera übereinstimmen)
-HEMERA_API_KEY=<gleicher-api-key-wie-oben>
+# API key for the Hemera service API (must match Hemera)
+HEMERA_API_KEY=<same-api-key-as-above>
 
-# Clerk Credentials (für lokale Aither-Auth)
+# Clerk credentials (for local Aither auth)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
 ```
 
-## Schritt 4: Berechtigungen verifizieren
+## Step 4: Verify Permissions
 
-Der Service-User hat folgende Berechtigungen (definiert in `lib/auth/permissions.ts`):
+The service user has the following permissions, defined in `lib/auth/permissions.ts`:
 
 ```typescript
 'api-client': [
@@ -97,22 +93,22 @@ Der Service-User hat folgende Berechtigungen (definiert in `lib/auth/permissions
 ]
 ```
 
-### Erlaubte Endpunkte:
+### Allowed Endpoints
 
-- ✅ `GET /api/service/courses` - Kursliste abrufen
-- ✅ `GET /api/service/courses/[id]` - Kursdetails mit Participations
-- ✅ `GET /api/service/participations/[id]` - Participation-Details
-- ✅ `PUT /api/service/participations/[id]/result` - Ergebnisse schreiben
+- ✅ `GET /api/service/courses` - Fetch course list
+- ✅ `GET /api/service/courses/[id]` - Fetch course details with participations
+- ✅ `GET /api/service/participations/[id]` - Fetch participation details
+- ✅ `PUT /api/service/participations/[id]/result` - Write results
 
-### Verbotene Endpunkte:
+### Forbidden Endpoints
 
-- ❌ `/api/admin/*` - Admin-Funktionen
-- ❌ `/api/courses` (ohne `/service/`) - Öffentliche API
-- ❌ Alle anderen nicht-service Endpunkte
+- ❌ `/api/admin/*` - Admin functions
+- ❌ `/api/courses` (without `/service/`) - Public API
+- ❌ All other non-service endpoints
 
-## Schritt 5: Integration testen
+## Step 5: Test the Integration
 
-### Test 1: Kursliste abrufen
+### Test 1: Fetch Course List
 
 ```bash
 curl -X GET https://hemera-academy.vercel.app/api/service/courses \
@@ -120,14 +116,14 @@ curl -X GET https://hemera-academy.vercel.app/api/service/courses \
   -H "Content-Type: application/json"
 ```
 
-**Erwartete Antwort** (200 OK):
+**Expected response** (200 OK):
 ```json
 {
   "success": true,
   "data": [
     {
       "id": "...",
-      "title": "Laparoskopie Basiskurs",
+      "title": "Basic Laparoscopy Course",
       "slug": "laparoskopie-basiskurs",
       "level": "BASIC",
       "startDate": "2026-03-15T00:00:00.000Z",
@@ -141,20 +137,20 @@ curl -X GET https://hemera-academy.vercel.app/api/service/courses \
 }
 ```
 
-### Test 2: Participation-Ergebnis schreiben
+### Test 2: Write Participation Result
 
 ```bash
 curl -X PUT https://hemera-academy.vercel.app/api/service/participations/PARTICIPATION_ID/result \
   -H "Authorization: Bearer YOUR_SERVICE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "resultOutcome": "Erfolgreich abgeschlossen",
-    "resultNotes": "Sehr gute Leistung",
+    "resultOutcome": "Successfully completed",
+    "resultNotes": "Very strong performance",
     "complete": true
   }'
 ```
 
-**Erwartete Antwort** (200 OK):
+**Expected response** (200 OK):
 ```json
 {
   "success": true,
@@ -165,14 +161,14 @@ curl -X PUT https://hemera-academy.vercel.app/api/service/participations/PARTICI
 }
 ```
 
-### Test 3: Fehlerfall - Ungültiges Token
+### Test 3: Error Case - Invalid Token
 
 ```bash
 curl -X GET https://hemera-academy.vercel.app/api/service/courses \
   -H "Authorization: Bearer invalid_token"
 ```
 
-**Erwartete Antwort** (401 Unauthorized):
+**Expected response** (401 Unauthorized):
 ```json
 {
   "success": false,
@@ -182,72 +178,72 @@ curl -X GET https://hemera-academy.vercel.app/api/service/courses \
 }
 ```
 
-## Sicherheitshinweise
+## Security Notes
 
-### Token-Sicherheit
+### Token Security
 
-1. **Niemals Token in Git committen**: `.env` ist in `.gitignore`
-2. **Token-Rotation**: Implementiere regelmäßige Token-Erneuerung
-3. **Sichere Speicherung**: Verwende Secret Manager (Vercel, AWS, GCP)
-4. **Monitoring**: Überwache API-Aufrufe via Rollbar
+1. **Never commit tokens to Git**: `.env` is in `.gitignore`
+2. **Token rotation**: Implement regular token renewal
+3. **Secure storage**: Use a secret manager (Vercel, AWS, GCP)
+4. **Monitoring**: Monitor API calls through Rollbar
 
 ### Rate Limiting
 
-Der Aither-Client ist auf **2 Requests/Sekunde** limitiert (p-throttle).
-Hemera-seitig gibt es zusätzliche Rate Limits pro User/Role.
+The Aither client is limited to **2 requests/second** (p-throttle).
+Hemera applies additional rate limits per user/role.
 
 ### Audit Trail
 
-Alle Service-API-Aufrufe werden geloggt:
-- User ID des Service-Users
-- Endpoint und Methode
-- Timestamp und Response Time
-- Status Code
+All service API calls are logged:
+- Service user ID
+- Endpoint and method
+- Timestamp and response time
+- Status code
 
-Logs sind in Rollbar und Hemera-Datenbank verfügbar.
+Logs are available in Rollbar and the Hemera database.
 
 ## Troubleshooting
 
 ### Problem: 401 Unauthorized
 
-**Ursache**: API-Key ungültig oder nicht gesetzt
+**Cause**: API key is invalid or not set
 
-**Lösung**:
-1. Prüfen, dass `HEMERA_API_KEY` in Aither gesetzt ist
-2. Prüfen, dass `HEMERA_SERVICE_API_KEY` in Hemera den gleichen Wert hat
-3. `HEMERA_SERVICE_API_KEY` in `.env` aktualisieren
+**Solution**:
+1. Verify that `HEMERA_API_KEY` is set in Aither
+2. Verify that `HEMERA_SERVICE_API_KEY` in Hemera has the same value
+3. Update `HEMERA_SERVICE_API_KEY` in `.env`
 
 ### Problem: 403 Forbidden
 
-**Ursache**: Service-User hat nicht die richtige Rolle
+**Cause**: The service user does not have the correct role
 
-**Lösung**:
-1. Clerk Dashboard öffnen
-2. Service-User suchen
-3. Public Metadata prüfen: `{ "role": "api-client" }`
-4. Falls falsch: Metadata korrigieren und speichern
+**Solution**:
+1. Open the Clerk dashboard
+2. Find the service user
+3. Verify public metadata: `{ "role": "api-client" }`
+4. If incorrect, fix the metadata and save it
 
 ### Problem: 429 Too Many Requests
 
-**Ursache**: Rate Limit überschritten
+**Cause**: Rate limit exceeded
 
-**Lösung**:
-1. Aither-Client respektiert automatisch `Retry-After` Header
-2. Warte auf automatischen Retry
-3. Falls persistent: Rate Limit in Hemera erhöhen
+**Solution**:
+1. The Aither client already honors the `Retry-After` header automatically
+2. Wait for the automatic retry
+3. If persistent, raise the rate limit in Hemera
 
 ### Problem: 500 Internal Server Error
 
-**Ursache**: Server-seitiger Fehler in Hemera
+**Cause**: Server-side error in Hemera
 
-**Lösung**:
-1. Rollbar Dashboard prüfen (Hemera-Projekt)
-2. Error-Details analysieren
-3. Bei Bedarf Hemera-Team kontaktieren
+**Solution**:
+1. Check the Rollbar dashboard (Hemera project)
+2. Analyze the error details
+3. Contact the Hemera team if needed
 
-## Token-Refresh-Strategie (Production)
+## Token Refresh Strategy (Production)
 
-Für Production sollte ein automatischer Token-Refresh implementiert werden:
+For production, implement automatic token refresh:
 
 ```typescript
 // In Aither: src/lib/hemera/token-manager.ts erweitern
@@ -304,7 +300,7 @@ class HemeraTokenManager {
 }
 ```
 
-## Weiterführende Dokumentation
+## Related Documentation
 
 - [Hemera API Documentation](../hemera/docs/api/README.md)
 - [Clerk Backend API](https://clerk.com/docs/reference/backend-api)

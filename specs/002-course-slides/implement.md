@@ -125,7 +125,7 @@ Create `tests/unit/course-resolver.spec.ts`:
 
 Add to `tests/unit/slide-builder.spec.ts`:
 - Course name centered in `<h1>`
-- Start date formatted in de-CH locale (e.g., "15. März 2026")
+- Start date formatted in de-CH locale (for example `15.03.2026`)
 - End date shown only when different from start date (YYYY-MM-DD comparison)
 - End date hidden when same day
 - HTML properly escaped

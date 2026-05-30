@@ -17,68 +17,68 @@ specify --help
 
 ## Data Sync (005-data-sync)
 
-Aither synchronisiert Kursdaten von der Hemera API und generiert statische HTML-Seiten für Trainer.
+Aither synchronizes course data from the Hemera API and generates static HTML pages for trainers.
 
-### Architektur
+### Architecture
 
 ```
 Cron / curl POST /api/sync
         ↓
-   Mutex (409 bei Overlap)
+   Mutex (409 on overlap)
         ↓
-   selectNextCourse() → nächster Kurs nach Startdatum
+   selectNextCourse() → next course by start date
         ↓
    Hemera API: GET /api/service/courses/:id
         ↓
-   Hash-basierter Vergleich (.sync-manifest.json)
-        ↓  (nur bei Änderung)
-   Handlebars-Template → HTML nach output/courses/
+   Hash-based comparison (.sync-manifest.json)
+        ↓  (only when changed)
+   Handlebars template → HTML into output/courses/
         ↓
-   Manifest aktualisieren
+   Update manifest
 ```
 
-### API-Endpunkte
+### API Endpoints
 
-| Methode | Pfad | Beschreibung | Status |
+| Method | Path | Description | Status |
 |---------|------|-------------|--------|
-| POST | `/api/sync` | Sync starten (fire-and-forget) | 202 / 409 |
-| GET | `/api/sync` | Letzten Job-Status abfragen | 200 / 404 |
+| POST | `/api/sync` | Start sync (fire-and-forget) | 202 / 409 |
+| GET | `/api/sync` | Fetch the latest job status | 200 / 404 |
 
-### Inkrementeller Sync
+### Incremental Sync
 
-- Dateihashes werden in `output/courses/.sync-manifest.json` gespeichert
-- Bei unveränderter Datenlage wird die HTML-Generierung übersprungen (`filesSkipped`)
-- Korrupte Manifeste werden per Rollbar-Warning geloggt und neu erstellt
+- File hashes are stored in `output/courses/.sync-manifest.json`
+- When the data has not changed, HTML generation is skipped (`filesSkipped`)
+- Corrupted manifests are logged as Rollbar warnings and rebuilt
 
 ### Homepage (SSR)
 
-Die Startseite (`src/app/page.tsx`) zeigt den nächsten Kurs mit Teilnehmer-Tabelle via Server-Side Rendering.
+The home page (`src/app/page.tsx`) renders the next course with a participant table via server-side rendering.
 
 ### Quickstart
 
-Siehe [`specs/005-data-sync/quickstart.md`](specs/005-data-sync/quickstart.md) für 7 Verifikationsschritte.
+See [`specs/005-data-sync/quickstart.md`](specs/005-data-sync/quickstart.md) for 7 verification steps.
 
 ### Cron-Scheduling
 
-Siehe [`docs/sync-scheduling.md`](docs/sync-scheduling.md) für Crontab-Beispiele und Monitoring.
+See [`docs/sync-scheduling.md`](docs/sync-scheduling.md) for crontab examples and monitoring guidance.
 
 ## Rollbar API Tokens
 
-**Wichtig:** Für AI-Tools, Automatisierung und Monitoring sollte ein Rollbar-Token mit minimalen Rechten verwendet werden.
+**Important:** Use a minimally scoped Rollbar token for AI tools, automation, and monitoring whenever possible.
 
-**Hinweis (Client):** Wenn `NEXT_PUBLIC_ROLLBAR_ENABLED=1` gesetzt ist, muss auch `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN` gesetzt werden. Andernfalls schlägt die Initialisierung im Browser fehl. Der Client-Token darf nur Lesezugriff besitzen und keine sensiblen Daten übertragen.
+**Client note:** If `NEXT_PUBLIC_ROLLBAR_ENABLED=1` is set, `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN` must also be set. Otherwise browser initialization fails. The client token should be read-only and must not allow sensitive data changes.
 
-- `ROLLBAR_ACCESS_TOKEN` (read+write): Nur verwenden, wenn Schreibzugriff wirklich benötigt wird.
-- `ROLLBAR_ACCESS_TOKEN_READONLY` (empfohlen): Für die meisten Integrationen reicht ein Read-Only-Token. Diesen im Rollbar-Dashboard unter "Project Access Tokens" erzeugen und in `.env` als `ROLLBAR_ACCESS_TOKEN_READONLY` setzen.
+- `ROLLBAR_ACCESS_TOKEN` (read+write): Use only when write access is genuinely required.
+- `ROLLBAR_ACCESS_TOKEN_READONLY` (recommended): A read-only token is sufficient for most integrations. Create it in the Rollbar dashboard under "Project Access Tokens" and set it in `.env` as `ROLLBAR_ACCESS_TOKEN_READONLY`.
 
-**Beispiel `.env`-Eintrag:**
+**Example `.env` entry:**
 
 ```env
-# Rollbar für AI-Tools (empfohlen: Read-Only)
+# Rollbar for AI tools (recommended: read-only)
 ROLLBAR_ACCESS_TOKEN_READONLY=your-rollbar-readonly-token
-# Nur falls Schreibzugriff benötigt wird:
+# Only if write access is required:
 # ROLLBAR_ACCESS_TOKEN=your-rollbar-read-write-token
 ```
 
-**Hinweis:** Die Anwendung und alle Automatisierungen sollten nach Möglichkeit immer den Read-Only-Token verwenden. Schreibende Aktionen sind nur für spezielle Admin- oder Deployment-Workflows nötig.
+**Note:** The application and all automation should prefer the read-only token whenever possible. Write-capable actions should be limited to special admin or deployment workflows.
 

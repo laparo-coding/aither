@@ -1,14 +1,16 @@
 ---
 # Aither Telemetry Whitelist
 
-Diese Datei enthält die Aither-spezifische Whitelist für `additionalData`-Schlüssel in `reportError(...)`-Aufrufen.
-Aither nutzt dieselben Datenschutzgrundsätze wie Hemera; hier sind die erlaubten Keys, ergänzt um projekt-spezifische Felder.
+Note: For the verified local Rollbar configuration and the minimal receipt checks for Gaia, Hemera, and Aither, refer to the workspace-wide checklist at `hemera/docs/monitoring/rollbar-local-checklist.md`.
 
-Grundsätze
-- Keine Klartext-Fehlertexte oder rohe HTTP-Antworten in `additionalData`.
-- E-Mails nur maskiert (z. B. `j***e@example.com`).
-- Tokens/API-Keys niemals in `additionalData`.
-- Bei Unsicherheit: redigieren (`"[redacted]"`).
+This file contains the Aither-specific whitelist for `additionalData` keys used in `reportError(...)` calls.
+Aither follows the same data protection rules as Hemera; the allowed keys are listed here together with project-specific additions.
+
+Principles
+- No plain-text error messages or raw HTTP responses in `additionalData`.
+- Emails must be masked only (for example `j***e@example.com`).
+- Never include tokens or API keys in `additionalData`.
+- When in doubt, redact (`"[redacted]"`).
 
 Aither Whitelist (top-level keys)
 - `context` (string)
@@ -16,7 +18,7 @@ Aither Whitelist (top-level keys)
 - `sessionId` (string)
 - `bookingId` (string)
 - `courseId` (string)
-- `userId` (string) — nur falls nötig
+- `userId` (string) — only when necessary
 - `paymentIntentId` (string)
 - `disputeId` (string)
 - `amount` (number)
@@ -33,22 +35,22 @@ Aither Whitelist (top-level keys)
 - `slowApiCall` (boolean)
 - `timestamp` (string)
 
-Aither-specific Ergänzungen
-- `aitherRequestId` (string) — korreliert mit Aither-Requests
-- `modelVersion` (string) — nur Versions-Metadaten, keine Modell-Ausgabe
-- `integrationPoint` (string) — beschreibend, z. B. `aither.ingest` oder `aither.predict`
+Aither-specific additions
+- `aitherRequestId` (string) — correlates with Aither requests
+- `modelVersion` (string) — version metadata only, never model output
+- `integrationPoint` (string) — descriptive value such as `aither.ingest` or `aither.predict`
 
-Redaction-Regeln
-- Key-Namen wie `/originalError/i`, `/errorMessage/i`, `/message$/i` müssen redigiert werden.
-- Falls ein Key nicht in dieser Whitelist auftaucht, muss entweder:
-  - vor Reporting redigiert werden, oder
-  - als Ausnahme dokumentiert und hier ergänzt werden.
+Redaction rules
+- Key names such as `/originalError/i`, `/errorMessage/i`, and `/message$/i` must be redacted.
+- If a key does not appear in this whitelist, it must either:
+  - be redacted before reporting, or
+  - be documented as an exception and added here.
 
 Enforcement
-- Verwende `scripts/check-reporterror-keys.mjs` (bereits im Repo), um Abweichungen zu finden.
-- In PRs für Aither-Integration bitte diese Datei referenzieren und ggf. neue Keys hier beantragen.
+- Use `scripts/check-reporterror-keys.mjs` (already in the repo) to find deviations.
+- In PRs for Aither integration, reference this file and request any new keys here when needed.
 
-Nächste Schritte
-- Falls Du möchtest, erweitere ich das Prüfskript, damit es Aither-spezifische Ausnahmen automatisch erlaubt (z. B. `specs/aither/**`), oder ich unterstütze beim Durchgehen der gefundenen Keys und passe `reportError`-Aufrufe an.
+Next steps
+- If needed, extend the validation script so it automatically allows Aither-specific exceptions (for example `specs/aither/**`), or review the discovered keys and adjust `reportError` call sites accordingly.
 
 ---

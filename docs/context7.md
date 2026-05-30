@@ -1,11 +1,11 @@
-# Context7 (Installation & Nutzung)
+# Context7 (Installation & Usage)
 
-Kurzanleitung zur Integration von Context7 in dieses Projekt (`aither`).
+Quick guide for integrating Context7 into this project (`aither`).
 
-- Paket installiert: `@upstash/context7-sdk`
-- Env-Variable: `CONTEXT7_API_KEY` (API-Key im Format `ctx7sk_...`)
+- Installed package: `@upstash/context7-sdk`
+- Environment variable: `CONTEXT7_API_KEY` (API key in the format `ctx7sk_...`)
 
-Beispiel (TypeScript):
+Example (TypeScript):
 
 ```ts
 import { Context7 } from "@upstash/context7-sdk";
@@ -32,7 +32,7 @@ async function getDocs(libraryName: string, question: string) {
 export { getDocs };
 ```
 
-Empfehlungen:
-- Setze `CONTEXT7_API_KEY` in deiner lokalen `.env.local` (niemals echte Keys commiten).
-- Verwende `searchLibrary` vor `getContext`, um die passende Library-ID zu ermitteln.
-- Bei produktiver Nutzung Caching für die Abfragen in `lib/cache` oder Redis verwenden.
+Recommendations:
+- Set `CONTEXT7_API_KEY` in your local `.env.local` file and never commit real keys.
+- Use `searchLibrary` before `getContext` to resolve the correct library ID.
+- For production usage, cache lookups in `lib/cache` or Redis.

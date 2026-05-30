@@ -96,7 +96,7 @@ The hemera `GET /api/service/courses/{id}/materials` endpoint returns:
           {
             "materialId": "clxyz...",
             "identifier": "video-analysis",
-            "title": "Videoanalyse-Arbeitsblatt",
+            "title": "Video Analysis Worksheet",
             "sortOrder": 1,
             "htmlContent": "<div>...</div>"
           }
@@ -240,8 +240,8 @@ All slides (intro, curriculum, material) now share the same `{NN}_{identifier}[_
 The `{identifier}` portion is slugified (lowercase, diacritics stripped, non-alphanumeric → hyphens). In participant-specific slides (Mode A with collection data, Mode B), `_{firstName}` is always appended. In non-participant slides (intro, curriculum, scalar-only), `_{firstName}` is omitted. Alphabetical sort by filename equals presentation order.
 
 **`{firstName}` normalization rules** (`normalizeFirstName`): When `_{firstName}` is appended, the raw first name MUST be normalized as follows:
-1. Apply Unicode NFKD decomposition and strip combining diacritical marks (e.g., Ä→A, ü→u, é→e).
-2. Map locale-specific characters: `ß` → `ss`.
+1. Apply Unicode NFKD decomposition and strip combining diacritical marks from accented characters.
+2. Map locale-specific sharp-s characters to `ss`.
 3. Transliterate remaining non-Latin characters to ASCII where possible. Characters that cannot be transliterated to `[A-Za-z0-9 ]` after this step are **dropped** (not replaced with a placeholder).
 4. Convert to lowercase.
 5. Replace any remaining non-alphanumeric characters and whitespace with a single hyphen (`-`).
@@ -250,7 +250,7 @@ The `{identifier}` portion is slugified (lowercase, diacritics stripped, non-alp
 8. **Empty-result fallback**: If the normalized result is an empty string after all preceding steps (e.g., a name consisting entirely of non-transliterable characters), use the deterministic fallback `FALLBACK_FIRST_NAME = "unnamed"`. Collision handling (step 9) applies to the fallback as well.
 9. **Collision handling**: If the resulting normalized filename already exists in the output directory, append a numeric suffix `_1`, `_2`, etc. directly after the `{firstName}` portion and before the file extension — format: `{NN}_{identifier}_{firstName}{_n}.html` (e.g., `005_preparation-sheet_anna_1.html`). Check sequentially (`_1`, `_2`, …) until a unique filename is found.
 
-Example: `"Ännä-Marie"` → NFKD → `"Anna-Marie"` → lowercase → `"anna-marie"`. `"Müller Straße"` → `"muller-strasse"`.
+Example: an accented first name such as `Anna-Maria` normalizes to `anna-maria`, and a compound surname such as `Miller Street` normalizes to `miller-street`.
 
 ---
 

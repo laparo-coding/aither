@@ -7,7 +7,7 @@ Aither runs as a self-hosted Next.js application on Linux. Scheduled syncs are t
 ## Prerequisites
 
 - Aither running on `http://localhost:3000` (or your configured host/port)
-- A valid authentication token for the sync API (Clerk admin session or a dedicated service token)
+- A valid authentication token for the sync API (recommended: the dedicated `AITHER_SYNC_TOKEN` service token)
 - `curl` installed on the host system
 
 ## Cron Configuration
@@ -32,7 +32,7 @@ crontab -e
 
 ```bash
 curl -X POST http://localhost:3000/api/sync \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $AITHER_SYNC_TOKEN" \
   -H "Content-Type: application/json"
 ```
 
@@ -51,7 +51,7 @@ curl -X POST http://localhost:3000/api/sync \
 
 ```bash
 curl -s http://localhost:3000/api/sync \
-  -H "Authorization: Bearer YOUR_TOKEN" | jq .
+  -H "Authorization: Bearer $AITHER_SYNC_TOKEN" | jq .
 ```
 
 ### Check Last Sync in Logs
@@ -107,5 +107,5 @@ sudo systemctl enable --now aither-sync.timer
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AITHER_SYNC_TOKEN` | Bearer token for cron authentication | — (required) |
+| `AITHER_SYNC_TOKEN` | Exact bearer token accepted by `/api/sync` for cron/service auth | — (required) |
 | `SYNC_TIMEOUT_MS` | Maximum sync duration before auto-release | `1800000` (30 min) |

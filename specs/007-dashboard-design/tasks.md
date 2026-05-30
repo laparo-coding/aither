@@ -51,7 +51,7 @@
 
 - [x] T009 [P] [US2] Write unit test for CourseCard in `tests/unit/dashboard-course-card.spec.ts` — assert rendering of title, level chip (German label), formatted dates, participant count, `data-testid="course-card"`
 - [x] T009b [P] [US2] Write unit test for course tie-breaking comparator (pure function) — assert: single course selected, earliest `startDate` wins, same `startDate` falls back to lexicographically smallest `id`, null `startDate` excluded, empty input returns null
-- [x] T010 [P] [US2] Write unit test for MaterialCard in `tests/unit/dashboard-material-card.spec.ts` — assert rendering of status chip (Generiert/Nicht generiert), slide count, formatted date, empty state ("Keine Folien vorhanden" when files empty + status not-generated), `data-testid="material-card"`.
+- [x] T010 [P] [US2] Write unit test for MaterialCard in `tests/unit/dashboard-material-card.spec.ts` — assert rendering of the status chip (Generated/Not generated), slide count, formatted date, and the empty state (`No slides available` when files are empty and status is not-generated), `data-testid="material-card"`.
 
 ### Implementation for US2
 
@@ -70,36 +70,36 @@
 
 ### Unit Tests for US3
 
-- [x] T013 [P] [US3] Write unit test for ParticipantsList in `tests/unit/dashboard-participants-list.spec.ts` — assert one item per participant, Avatar with initials, expand/collapse for detail fields, empty state "Keine Teilnehmer.", alphabetical sort order (multi-participant fixture with mixed case, null-name participant sorted last), `role="region"` + `aria-labelledby` on Collapse panels, `data-testid="participants-list"`
+- [x] T013 [P] [US3] Write unit test for ParticipantsList in `tests/unit/dashboard-participants-list.spec.ts` — assert one item per participant, Avatar with initials, expand/collapse for detail fields, empty state `No participants.`, alphabetical sort order (multi-participant fixture with mixed case, null-name participant sorted last), `role="region"` + `aria-labelledby` on Collapse panels, `data-testid="participants-list"`
 - [x] T013b [P] [US3] Write keyboard navigation test for ParticipantsList using `@testing-library/react` + `userEvent` — assert: Enter/Space toggles `aria-expanded`, Escape closes expanded panel and returns focus to toggle, ArrowUp/ArrowDown navigates between ListItem rows, Home/End moves focus to first/last ListItem, Tab traverses focusable elements inside expanded Collapse panel
-- [x] T014 [P] [US3] Write unit test for SlidesList in `tests/unit/dashboard-slides-list.spec.ts` — assert one item per file, filename displayed, clickable link opens preview Modal, Modal shows filename title + close button, preview error state renders error message + retry, empty state "Keine Folien generiert.", `data-testid="slides-list"`, `data-testid="slide-preview-modal"`
+- [x] T014 [P] [US3] Write unit test for SlidesList in `tests/unit/dashboard-slides-list.spec.ts` — assert one item per file, filename displayed, clickable link opens preview Modal, Modal shows filename title + close button, preview error state renders error message + retry, empty state `No slides generated.`, `data-testid="slides-list"`, `data-testid="slide-preview-modal"`
 
 ### Implementation for US3
 
-- [x] T015 [P] [US3] Create ParticipantsList client component in `src/app/components/dashboard/section-b-participants-list.tsx` — `Paper` wrapper, heading "Teilnehmer & Vorbereitungen", MUI `List` with compact cards (Avatar with initials + deterministic color, name, completion status), expandable detail panel (preparation intent, desired results, line manager profile), empty state
-- [x] T016 [P] [US3] Create SlidesList client component in `src/app/components/dashboard/section-b-slides-list.tsx` — `Paper` wrapper, heading "Kursfolien", MUI `List` with one row per file (filename, clickable link opening preview Modal), preview Modal (`Dialog` with close button, filename title, `data-testid="slide-preview-modal"`), preview error state with retry button, empty state. Requires rework: existing implementation lacks preview Modal.
+- [x] T015 [P] [US3] Create ParticipantsList client component in `src/app/components/dashboard/section-b-participants-list.tsx` — `Paper` wrapper, heading `Participants & Preparations`, MUI `List` with compact cards (Avatar with initials + deterministic color, name, completion status), expandable detail panel (preparation intent, desired results, line manager profile), empty state
+- [x] T016 [P] [US3] Create SlidesList client component in `src/app/components/dashboard/section-b-slides-list.tsx` — `Paper` wrapper, heading `Course Slides`, MUI `List` with one row per file (filename, clickable link opening preview Modal), preview Modal (`Dialog` with close button, filename title, `data-testid="slide-preview-modal"`), preview error state with retry button, empty state. Requires rework: existing implementation lacks preview Modal.
 
 **Checkpoint**: Section B renders two lists side-by-side. Participant cards expand/collapse. Slides list links to preview files.
 
 ---
 
-## Phase 5: User Story 4 — Section C & D: Steuerung & Kamera (Priority: P3)
+## Phase 5: User Story 4 — Section C & D: Controls & Camera (Priority: P3)
 
-**Goal**: Steuerung endpoint cards and a dedicated camera section below.
+**Goal**: Controls endpoint cards and a dedicated camera section below.
 
-**Independent Test**: Steuerung cards render for all endpoints with status chips. Camera card renders with existing CameraSnapshot component.
+**Independent Test**: Controls cards render for all endpoints with status chips. Camera card renders with the existing CameraSnapshot component.
 
 ### Unit Tests for US4
 
-- [x] T017 [P] [US4] Write unit test for SteuerungCards in `tests/unit/dashboard-steuerung-cards.spec.ts` — assert cards rendered for all endpoints, each showing path/method/status chip, responsive grid layout, descriptive `aria-label` on each status Chip ("endpoint-path method status"), `data-testid="steuerung-cards"`
-- [x] T017b [P] [US4] Write unit test for CameraSection in `tests/unit/dashboard-camera-card.spec.ts` — assert heading “Kamera” rendered, CameraSnapshot component embedded, `data-testid="camera-card"`
+- [x] T017 [P] [US4] Write unit test for ControlsCards in `tests/unit/dashboard-steuerung-cards.spec.ts` — assert cards rendered for all endpoints, each showing path/method/status chip, responsive grid layout, descriptive `aria-label` on each status Chip (`endpoint-path method status`), `data-testid="steuerung-cards"`
+- [x] T017b [P] [US4] Write unit test for CameraSection in `tests/unit/dashboard-camera-card.spec.ts` — assert heading `Camera` rendered, CameraSnapshot component embedded, `data-testid="camera-card"`
 - [x] T017c [P] [US4] Verify `CameraSnapshot` polling, reconnect, and additive backoff behavior in `tests/unit/camera-snapshot.spec.ts` against Section D requirements; extend implementation if gaps remain
 
 ### Implementation for US4
 
-- [x] T018 [US4] Create SteuerungCards client component in `src/app/components/dashboard/section-c-steuerung-cards.tsx` — heading "Steuerung", responsive grid of `Paper` cards (`{ xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }`), each card showing endpoint path, HTTP method, status `Chip` (OK/Error/Loading), reuse health check logic from existing `EndpointStatus` component
+- [x] T018 [US4] Create ControlsCards client component in `src/app/components/dashboard/section-c-steuerung-cards.tsx` — heading `Controls`, responsive grid of `Paper` cards (`{ xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }`), each card showing endpoint path, HTTP method, status `Chip` (OK/Error/Loading), reuse health check logic from existing `EndpointStatus` component
 - [x] T018a [P] [US4] Extract shared monitored endpoint definitions to `src/app/components/endpoint-config.ts` and update `src/app/components/endpoint-status.tsx` plus `src/app/components/dashboard/section-c-steuerung-cards.tsx` to consume `MONITORED_ENDPOINTS`
-- [x] T019 [P] [US4] Create CameraSection component in `src/app/components/dashboard/section-d-camera-card.tsx` — `Paper` wrapper, heading "Kamera", embed existing `CameraSnapshot` component, `data-testid="camera-card"`
+- [x] T019 [P] [US4] Create CameraSection component in `src/app/components/dashboard/section-d-camera-card.tsx` — `Paper` wrapper, heading `Camera`, embed existing `CameraSnapshot` component, `data-testid="camera-card"`
 
 **Checkpoint**: Section C shows endpoint cards in responsive grid. Section D shows camera snapshot.
 
@@ -208,6 +208,6 @@ Phase 2 complete (Theme) →
 1. Setup + Theme → Foundation ready
 2. Add Section A → Course + Material visible (MVP)
 3. Add Section B → Participants + Slides visible
-4. Add Section C+D → Steuerung + Kamera visible
+4. Add Section C+D → Controls + Camera visible
 5. Compose full page → All sections integrated
 6. Polish → Tests pass, build succeeds, quality gates green

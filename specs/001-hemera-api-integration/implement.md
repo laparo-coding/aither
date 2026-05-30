@@ -278,13 +278,13 @@ export function registerMediaHelpers(): void {
     const safeUrl = Handlebars.Utils.escapeExpression(sourceUrl);
     const safeAlt = Handlebars.Utils.escapeExpression(altText ?? "");
     return new Handlebars.SafeString(
-      `<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" onerror="this.outerHTML='<p class=\\'media-fallback\\'>Bild nicht verfügbar</p>'" />`
+      `<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" onerror="this.outerHTML='<p class=\\'media-fallback\\'>Image unavailable</p>'" />`
     );
   });
   Handlebars.registerHelper("video", (sourceUrl: string) => {
     const safeUrl = Handlebars.Utils.escapeExpression(sourceUrl);
     return new Handlebars.SafeString(
-      `<video controls preload="metadata" src="${safeUrl}"><p class="media-fallback">Video nicht verfügbar</p></video>`
+      `<video controls preload="metadata" src="${safeUrl}"><p class="media-fallback">Video unavailable</p></video>`
     );
   });
 }

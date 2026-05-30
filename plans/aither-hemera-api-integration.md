@@ -1,25 +1,25 @@
 # Aither → Hemera API Integration Plan
 
-## Kontext
+## Context
 
-Die **Aither-App** (Next.js + Clerk) muss auf die **Hemera API** zugreifen, um:
-1. **Seminar-/Kursdaten lesen** (Courses, Bookings, Teilnehmer)
-2. **Teilnehmer-spezifische Ergebnisse schreiben** (CourseParticipation-Felder: `resultOutcome`, `resultNotes`)
+The **Aither app** (Next.js + Clerk) must access the **Hemera API** in order to:
+1. **Read seminar/course data** (courses, bookings, participants)
+2. **Write participant-specific results** (`CourseParticipation` fields: `resultOutcome`, `resultNotes`)
 
-Beide Apps nutzen Clerk als Auth-Provider.
+Both apps use Clerk as the auth provider.
 
 ---
 
 ## Empfehlung: Dedizierter Service-User mit Clerk
 
-### Warum NICHT den Admin-Account verwenden?
+### Why NOT use the admin account?
 
 | Risiko | Beschreibung |
 |--------|-------------|
-| **Überprivilegierung** | Admin hat Zugriff auf alles - Aither braucht nur Kurs- und Teilnehmerdaten |
+| **Over-privileging** | The admin can access everything, while Aither only needs course and participant data |
 | **Audit-Verlust** | Alle Aither-Aktionen erscheinen als Admin-Aktionen im Log |
 | **Credential-Kopplung** | Wenn Aither kompromittiert wird, ist der Admin-Zugang betroffen |
-| **Session-Konflikte** | Admin-Sessions könnten durch parallele Nutzung gestört werden |
+| **Session conflicts** | Admin sessions could be disrupted by parallel use |
 
 ### Empfohlener Ansatz: Clerk JWT + Service-Rolle
 
@@ -57,7 +57,7 @@ export async function getUserRole(userId: string): Promise<string | null> {
 }
 ```
 
-Endpoint‑Änderung: Stelle sicher, dass `auth()` ein `userId` liefert, bevor `getUserRole(userId)` aufgerufen wird; wenn `userId` fehlt -> return 401; wenn `getUserRole` einen nicht erlaubten Wert liefert -> return 403. Später kann die einfache Rollenprüfung durch feinere Berechtigungsprüfungen ersetzt werden.
+Endpoint change: Ensure that `auth()` returns a `userId` before calling `getUserRole(userId)`; if `userId` is missing, return 401; if `getUserRole` returns a disallowed value, return 403. The simple role check can later be replaced with more fine-grained permission checks.
 
 
 ### Architektur-Optionen
@@ -66,11 +66,11 @@ Endpoint‑Änderung: Stelle sicher, dass `auth()` ein `userId` liefert, bevor `
 
 1. **Neuen Clerk-User anlegen** (z.B. `aither-service@hemera-academy.com`)
 2. **Eigene Rolle zuweisen** via `publicMetadata`: `{ "role": "api-client" }`
-3. **Hemera erweitern**: Neue Rolle `api-client` in `lib/auth/permissions.ts` mit eingeschränkten Rechten
+3. **Extend Hemera**: Add a new `api-client` role in `lib/auth/permissions.ts` with limited permissions
 4. **Aither**: Clerk Backend-SDK nutzen, um JWT zu generieren und an Hemera-API zu senden
 
 **Vorteile:**
-- Minimale Änderungen an Hemera (nur Rolle + Permissions erweitern)
+- Minimal changes to Hemera (only extend role + permissions)
 - Clerk verwaltet Credentials zentral
 - Audit-Trail zeigt klar "aither-service" als Akteur
 - Gleiche Auth-Infrastruktur wie bestehende User
@@ -81,44 +81,44 @@ Endpoint‑Änderung: Stelle sicher, dass `auth()` ein `userId` liefert, bevor `
 
 #### Option B: Clerk Machine-to-Machine (M2M) Token
 
-1. **Clerk JWT Template** erstellen für Service-Zugriff
+1. **Create a Clerk JWT template** for service access
 2. **API Key** in Clerk Dashboard generieren
-3. **Hemera Middleware** erweitern für M2M-Token-Validierung
+3. **Extend the Hemera middleware** for M2M token validation
 
 **Vorteile:**
-- Kein User-Seat nötig
+- No user seat required
 - Saubere M2M-Trennung
 
 **Nachteile:**
 - Clerk M2M ist ein neueres Feature, erfordert ggf. Plan-Upgrade
-- Mehr Middleware-Anpassungen in Hemera nötig
+- Requires more middleware changes in Hemera
 
-#### Option C: Shared API Key (einfachste Lösung)
+#### Option C: Shared API Key (simplest solution)
 
 1. **API Key** als Environment Variable in beiden Apps
-2. **Hemera**: Neuer Middleware-Check für `x-api-key` Header
+2. **Hemera**: Add a new middleware check for the `x-api-key` header
 3. **Aither**: API Key bei jedem Request mitsenden
 
 **Vorteile:**
 - Sehr einfach zu implementieren
-- Keine Clerk-Abhängigkeit für Service-Kommunikation
+- No Clerk dependency for service-to-service communication
 
 **Nachteile:**
-- Kein User-Kontext (kein Audit wer genau was tat)
+- No user context (no audit trail showing exactly who did what)
 - Key-Rotation muss manuell erfolgen
-- Weniger sicher als JWT-basierte Lösung
+- Less secure than a JWT-based approach
 
 ---
 
 ## Empfohlene Implementierung: Option A
 
-### Schritt-für-Schritt Plan
+### Step-by-Step Plan
 
 #### 1. Clerk: Service-User anlegen
 - Neuen User in Clerk Dashboard erstellen: `aither-service@hemera-academy.com`
 - `publicMetadata` setzen: `{ "role": "api-client", "service": "aither" }`
 
-#### 2. Hemera: Neue Rolle `api-client` einführen
+#### 2. Hemera: Introduce the new `api-client` role
 
 **Datei:** `lib/auth/permissions.ts`
 - `UserRole` erweitern um `api-client`
@@ -130,18 +130,18 @@ Endpoint‑Änderung: Stelle sicher, dass `auth()` ein `userId` liefert, bevor `
   - `manage:courses` ❌
   - `manage:users` ❌
 
-#### 3. Hemera: Neue API-Endpunkte für Service-Zugriff
+#### 3. Hemera: Add new API endpoints for service access
 
 Neue Route-Gruppe `app/api/service/` mit:
 
 | Endpunkt | Methode | Beschreibung |
 |----------|---------|-------------|
-| `/api/service/courses` | GET | Kurse mit Teilnehmerdaten lesen |
-| `/api/service/courses/[id]` | GET | Einzelnen Kurs mit Buchungen lesen |
-| `/api/service/participations/[id]` | GET | Participation-Details lesen |
-| `/api/service/participations/[id]/result` | PUT | Ergebnis-Daten schreiben |
+| `/api/service/courses` | GET | Read courses with participant data |
+| `/api/service/courses/[id]` | GET | Read a single course with bookings |
+| `/api/service/participations/[id]` | GET | Read participation details |
+| `/api/service/participations/[id]/result` | PUT | Write result data |
 
-Jeder Endpunkt prüft:
+Each endpoint checks:
 ```typescript
 import { auth } from '@clerk/nextjs/server';
 
@@ -162,9 +162,9 @@ export async function GET(request: Request) {
 }
 ```
 
-#### 4. Aither: Clerk Backend-SDK für API-Calls
+#### 4. Aither: Use the Clerk backend SDK for API calls
 
-Wichtig: Für Service‑zu‑Service Flows darf die Aither‑Seite **nicht** auf einen interaktiven User‑Session‑Token (sessionId) setzen. Stattdessen sollte Aither einen serverseitigen Service‑Token / API‑Key verwenden, der vom Clerk Backend SDK oder als dedizierter Service‑Credential verwaltet wird. Verwende ein explizites Token‑Caching/Rotation‑Pattern (siehe "JWT / Token Management" unten).
+Important: For service-to-service flows, the Aither side must **not** depend on an interactive user session token (`sessionId`). Instead, Aither should use a server-side service token / API key managed either by the Clerk backend SDK or as a dedicated service credential. Use an explicit token caching/rotation pattern (see "JWT / Token Management" below).
 
 Pseudocode / Pattern (serverseitig in Aither):
 
@@ -201,25 +201,25 @@ const response = await fetch(`${process.env.HEMERA_API_BASE_URL}/api/service/cou
 ```
 
 Implementierungs‑Hinweise:
-- Lade `CLERK_SERVICE_USER_API_KEY` (oder `CLERK_SERVICE_USER_SIGNIN_TOKEN`) aus der Umgebung / dem Secrets-Manager. Das obige Muster verwendet einen statischen, vorab bereitgestellten Service-Credential — es wird zur Laufzeit kein Token dynamisch geminted.
+- Load `CLERK_SERVICE_USER_API_KEY` (or `CLERK_SERVICE_USER_SIGNIN_TOKEN`) from the environment / secrets manager. The pattern above uses a static pre-provisioned service credential; no token is minted dynamically at runtime.
 - Implementiere `tokenCache` in Aither; for horizontal scalability use a shared cache (Redis, Vercel KV) instead of process memory.
 - On 401 responses that include `WWW-Authenticate` or an expiry indication, refresh the credential from the environment once and retry the failed request (retry-on-expiry).
 
-#### 5. Hemera: Middleware anpassen
+#### 5. Hemera: Adjust the Middleware
 
-**Datei:** `proxy.ts` (im Hemera-Repo, `proxy.ts` im Projekt‑Root) — Sicherstellen, dass `/api/service/*` Routen durch Clerk‑Auth gehen.
+**File:** `proxy.ts` (in the Hemera repo, `proxy.ts` at the project root) — ensure that `/api/service/*` routes are protected by Clerk auth.
 
-Implementierungs‑Hinweise für `proxy.ts`:
-- `proxy.ts` ist der zentrale Next.js/Edge/Proxy‑Handler (siehe vorhandene `proxy.ts` im Repo). Ergänze dort oder importiere eine Middleware, die speziell Routen mit dem Muster `/api/service/*` abfängt und die Clerk‑Verifikation ausführt (z. B. `auth()` / `clerkMiddleware()` / `verifySession`).
-- Die Middleware sollte das validierte `userId` und `role` in die Request‑Context/Headers injizieren, damit die eigentlichen Route‑Handler (`app/api/service/*`) die Rolle prüfen können.
+Implementation notes for `proxy.ts`:
+- `proxy.ts` is the central Next.js/Edge proxy handler (see the existing `proxy.ts` in the repo). Extend it or import middleware that specifically intercepts routes matching `/api/service/*` and runs Clerk verification (for example `auth()` / `clerkMiddleware()` / `verifySession`).
+- The middleware should inject the validated `userId` and `role` into the request context/headers so the actual route handlers under `app/api/service/*` can check the role.
 - Exportiere den konfigurierten Handler / Middleware (z. B. `proxyMiddleware`) so er dort zentral verwendet werden kann.
 
-### JWT / Token Management (zusätzliche Hinweise)
+### JWT / Token Management (additional notes)
 
-- Access token lifetime: Wir empfehlen kurze Access Tokens (z. B. 15 Minuten) und eine Refresh‑Cadence in Aither, die Tokens proaktiv erneuert (z. B. erneuern wenn <= 2 Minuten Gültigkeit verbleiben) oder alle 10 Minuten.
-- Token Caching: Implementiere in Aither eine `getServiceToken()`‑Funktion mit einem `tokenCache` (in-memory für dev, Redis/Vercel KV für Production) und sichere Rotation.
-- Retry on expiry: Wenn Hemera 401/WWW‑Authenticate zurückgibt, soll Aither einmal das Token erneuern und den Request erneut ausführen.
-- Fehlerbehandlung: Wenn Refresh/Retries fehlschlagen, protokolliere und entferne fehlerhafte cached tokens, und schlage fehl mit 5xx/401 je nach Ursache.
+- Access token lifetime: We recommend short-lived access tokens (for example 15 minutes) and a refresh cadence in Aither that renews tokens proactively (for example when <= 2 minutes of validity remain) or every 10 minutes.
+- Token caching: Implement a `getServiceToken()` function in Aither with a `tokenCache` (in-memory for dev, Redis/Vercel KV for production) and safe rotation.
+- Retry on expiry: If Hemera returns 401/`WWW-Authenticate`, Aither should refresh the token once and retry the request.
+- Error handling: If refresh/retries fail, log the issue, remove invalid cached tokens, and fail with 5xx/401 depending on the cause.
 
 ---
 
@@ -251,11 +251,11 @@ flowchart LR
     H3 --> H4
 ```
 
-## Sicherheitsaspekte
+## Security Considerations
 
-- **Principle of Least Privilege**: `api-client` Rolle hat nur die minimal nötigen Rechte
+- **Principle of Least Privilege**: The `api-client` role has only the minimum required permissions
 - **Audit Trail**: Alle Aktionen sind dem Service-User zugeordnet
-- **JWT-Validierung**: Clerk verifiziert Token-Integrität und -Ablauf
+- **JWT validation**: Clerk verifies token integrity and expiration
 
 ### Rate Limiting (implementation guidance)
 
@@ -314,42 +314,42 @@ function logPIIAccess(requesterId: string, fields: string[], reason: string) {
 // Guidance: Enumerate all PII fields centrally (email, phoneNumber, birthDate, fullName, billingAddress, cardNumber, transactionId, paymentMethod) and specify strategy per field (remove/hash/pseudonymize). Use a KMS-backed HMAC key or KMS envelope encryption for stable pseudonymization and rotate keys following your key rotation policy.
 
 
-## Geklärte Rahmenbedingungen
+## Confirmed Constraints
 
 | Frage | Antwort |
 |-------|---------|
 | Hosting | Hemera auf Vercel, Aither lokal/anderer Host |
 | Datenzugriff | Kurse, Bookings und Participations. Sensitive booking fields are explicitly excluded from responses: `paymentMethod`, `cardNumber`, `billingAddress`, `transactionId`. `CourseParticipation` exposes only `id`, `courseId`, `userId` (pseudonymous), `resultOutcome`, and `resultNotes`. PII fields (e.g., `email`, `phoneNumber`, `birthDate`, `fullName`) are redacted or hashed before returning. |
-| Clerk-Plan | Free/Hobby - kein M2M verfügbar → **Option A bestätigt** |
+| Clerk-Plan | Free/Hobby - no M2M available → **Option A confirmed** |
 
 ---
 
-## Implementierungs-Tasks (Hemera-Seite)
+## Implementation Tasks (Hemera Side)
 
-- [ ] Clerk: Service-User `aither-service@hemera-academy.com` anlegen und `publicMetadata.role = "api-client"` setzen
+- [ ] Clerk: Create service user `aither-service@hemera-academy.com` and set `publicMetadata.role = "api-client"`
 - [ ] `lib/auth/permissions.ts`: `UserRole` um `api-client` erweitern mit Permissions `read:courses`, `read:participations`, `write:participation-results`
-- [ ] `app/api/service/courses/route.ts`: GET-Endpunkt für Kursliste (mit Teilnehmer-Anzahl)
-- [ ] `app/api/service/courses/[id]/route.ts`: GET-Endpunkt für Kursdetails inkl. Participations
-- [ ] `app/api/service/participations/[id]/route.ts`: GET-Endpunkt für Participation-Details
-- [ ] `app/api/service/participations/[id]/result/route.ts`: PUT-Endpunkt für Ergebnis-Daten schreiben
-- [ ] Auth-Guard Helper für `/api/service/*` Routen erstellen (Rolle `api-client` oder `admin` prüfen)
-- [ ] Rate Limiting für `/api/service/*` Endpunkte einführen
-- [ ] Tests: Contract-Tests für die neuen Service-Endpunkte
+- [ ] `app/api/service/courses/route.ts`: GET endpoint for the course list (with participant count)
+- [ ] `app/api/service/courses/[id]/route.ts`: GET endpoint for course details including participations
+- [ ] `app/api/service/participations/[id]/route.ts`: GET endpoint for participation details
+- [ ] `app/api/service/participations/[id]/result/route.ts`: PUT endpoint to write result data
+- [ ] Create auth guard helper for `/api/service/*` routes (allow `api-client` or `admin`)
+- [ ] Add rate limiting for `/api/service/*` endpoints
+- [ ] Tests: contract tests for the new service endpoints
 
-## Implementierungs-Tasks (Aither-Seite)
+## Implementation Tasks (Aither Side)
 
-- [ ] Hemera API Client erstellen mit Clerk Backend-SDK JWT-Generierung
-- [ ] Environment Variables konfigurieren (`HEMERA_API_URL`, Clerk Service-User Credentials)
-- [ ] API-Aufrufe für Kurs- und Participation-Daten implementieren
+- [ ] Create the Hemera API client with Clerk backend SDK JWT generation
+- [ ] Configure environment variables (`HEMERA_API_URL`, Clerk service-user credentials)
+- [ ] Implement API calls for course and participation data
 
 ### Environment Variables (Checklist)
 
 Die folgenden Environment-Variablen sollten gesetzt und dokumentiert werden (server-side vs client-side gekennzeichnet):
 
-- `HEMERA_API_URL` (server-side): Hemera API base URL, z. B. `https://hemera.example.com`
+- `HEMERA_API_URL` (server-side): Hemera API base URL, for example `https://hemera.example.com`
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (client-side): Clerk publishable key
-- `CLERK_SECRET_KEY` (server-side): Clerk secret key für backend SDKs
-- `CLERK_SERVICE_USER_EMAIL` (server-side): E‑Mail des Service‑Users (Referenz)
-- `CLERK_SERVICE_USER_API_KEY` oder `CLERK_SERVICE_USER_ID` (server-side): Service User credential/ID für serverseitige Integrationen
+- `CLERK_SECRET_KEY` (server-side): Clerk secret key for backend SDKs
+- `CLERK_SERVICE_USER_EMAIL` (server-side): service user email (reference)
+- `CLERK_SERVICE_USER_API_KEY` or `CLERK_SERVICE_USER_ID` (server-side): service user credential/ID for server-side integrations
 
-Hinweis: `NEXT_PUBLIC_` Präfix markiert client-seitige Variablen; alle anderen Variablen sind vertraulich und gehören in einen Secret Store (Vercel/GCP/AWS/etc.).
+Note: The `NEXT_PUBLIC_` prefix marks client-side variables; all other variables are confidential and belong in a secret store (Vercel/GCP/AWS/etc.).

@@ -5,7 +5,7 @@
 
 ## Summary
 
-Redesign the Aither dashboard (`src/app/page.tsx`) from a flat table-based layout into a structured four-section card-based composition (A: Course + Material, B: Participants + Slides, C: Steuerung, D: Kamera). Adopt the Hemera design system (MUI theme, design tokens, ThemeRegistry pattern, CSS variables, Google Fonts) to ensure visual coherence between both applications. Reuse the existing camera and endpoint probing logic where possible by extracting shared endpoint configuration and by keeping `CameraSnapshot` as the owner of refresh/reconnect behavior.
+Redesign the Aither dashboard (`src/app/page.tsx`) from a flat table-based layout into a structured four-section card-based composition (A: Course + Material, B: Participants + Slides, C: Controls, D: Camera). Adopt the Hemera design system (MUI theme, design tokens, ThemeRegistry pattern, CSS variables, Google Fonts) to ensure visual coherence between both applications. Reuse the existing camera and endpoint probing logic where possible by extracting shared endpoint configuration and by keeping `CameraSnapshot` as the owner of refresh/reconnect behavior.
 
 ## Technical Context
 

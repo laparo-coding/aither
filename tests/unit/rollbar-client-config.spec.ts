@@ -157,5 +157,12 @@ describe("Rollbar client configuration", () => {
 				},
 			}),
 		).toBeUndefined();
+
+		expect(
+			resolveServerRoot({
+				isNodeRuntime: true,
+				getCwd: () => "   ",
+			}),
+		).toBeUndefined();
 	});
 });

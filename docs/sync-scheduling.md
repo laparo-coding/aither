@@ -1,49 +1,49 @@
-# Sync Scheduling — Cron-Konfiguration
+# Sync Scheduling — Cron Configuration
 
-> **Feature:** 005-data-sync — Periodische Synchronisation der Kurs- und Teilnehmerdaten von Hemera nach Aither.
+> **Feature:** 005-data-sync — Periodic synchronization of course and participant data from Hemera to Aither.
 
-## Übersicht
+## Overview
 
-Die Aither-Sync-Pipeline wird über `POST /api/sync` ausgelöst. Für automatische, regelmäßige Synchronisation kann ein Cron-Job (z.B. via `crontab`, Vercel Cron, oder externes Scheduling) konfiguriert werden.
+The Aither sync pipeline is triggered through `POST /api/sync`. For automatic recurring synchronization, configure a cron job via `crontab`, Vercel Cron, or an external scheduler.
 
-## Crontab-Beispiel
+## Crontab Example
 
 ```bash
-# Alle 30 Minuten Sync triggern (z.B. auf dem Aither-Server oder einem Scheduler)
+# Trigger sync every 30 minutes (for example on the Aither server or a scheduler)
 */30 * * * * curl -s -X POST https://aither.example.com/api/sync \
-  -H "Authorization: Bearer $AITHER_ADMIN_TOKEN" \
+  -H "Authorization: Bearer $AITHER_SYNC_TOKEN" \
   -H "Content-Type: application/json" \
   -o /dev/null -w "%{http_code}" \
-  | xargs -I{} sh -c 'if [ "{}" != "202" ] && [ "{}" != "409" ]; then echo "Sync fehlgeschlagen: HTTP {}" >&2; fi'
+  | xargs -I{} sh -c 'if [ "{}" != "202" ] && [ "{}" != "409" ]; then echo "Sync failed: HTTP {}" >&2; fi'
 ```
 
-### Erklärung
+### Explanation
 
-| Parameter | Beschreibung |
+| Parameter | Description |
 |-----------|-------------|
-| `*/30 * * * *` | Alle 30 Minuten (anpassbar: `0 */2 * * *` für alle 2 Stunden) |
-| `Authorization: Bearer $AITHER_ADMIN_TOKEN` | Admin-Token für authentifizierten Zugriff (Clerk-basiert) |
-| `-o /dev/null -w "%{http_code}"` | Nur HTTP-Status-Code ausgeben |
+| `*/30 * * * *` | Every 30 minutes (adjustable: `0 */2 * * *` for every 2 hours) |
+| `Authorization: Bearer $AITHER_SYNC_TOKEN` | Dedicated service token; only an exact match against `AITHER_SYNC_TOKEN` bypasses Clerk for `/api/sync` |
+| `-o /dev/null -w "%{http_code}"` | Output only the HTTP status code |
 
-### Erwartete HTTP-Responses
+### Expected HTTP Responses
 
-| Status | Bedeutung | Aktion |
+| Status | Meaning | Action |
 |--------|-----------|--------|
-| **202 Accepted** | Sync gestartet. Body: `{ "success": true, "data": { "jobId": "sync-...", "status": "running", "startTime": "2026-02-22T..." }, "meta": { "requestId": "req-...", "timestamp": "2026-02-22T..." } }` | Kein Handlungsbedarf |
-| **409 Conflict** | Bereits ein Sync aktiv. Body: `{ "success": false, "error": { "code": "SYNC_IN_PROGRESS", "message": "A sync operation is already running" }, "meta": { "requestId": "req-...", "timestamp": "2026-02-22T..." } }` | Normal bei überlappenden Cron-Triggern — kein Fehler |
-| **401/403** | Authentifizierung fehlgeschlagen | Token prüfen, Rollbar-Alert erwarten |
-| **500** | Server-Fehler | Rollbar-Alert wird automatisch ausgelöst |
+| **202 Accepted** | Sync started. Body: `{ "success": true, "data": { "jobId": "sync-...", "status": "running", "startTime": "2026-02-22T..." }, "meta": { "requestId": "req-...", "timestamp": "2026-02-22T..." } }` | No action required |
+| **409 Conflict** | A sync is already running. Body: `{ "success": false, "error": { "code": "SYNC_IN_PROGRESS", "message": "A sync operation is already running" }, "meta": { "requestId": "req-...", "timestamp": "2026-02-22T..." } }` | Normal for overlapping cron triggers — not an error |
+| **401/403** | Authentication failed | Verify the exact `AITHER_SYNC_TOKEN` or admin access and expect a Rollbar alert |
+| **500** | Server error | A Rollbar alert is triggered automatically |
 
-## Überlappende Cron-Trigger
+## Overlapping Cron Triggers
 
-Die Sync-API verwendet einen **In-Memory-Mutex**. Wenn ein Cron-Trigger eintrifft während ein vorheriger Sync noch läuft, wird `409 SYNC_IN_PROGRESS` zurückgegeben. Dies ist **erwartetes Verhalten** und kein Fehler.
+The sync API uses an **in-memory mutex**. If a cron trigger arrives while a previous sync is still running, it returns `409 SYNC_IN_PROGRESS`. This is **expected behavior** and not an error.
 
-- Der Mutex hat ein automatisches Timeout von 30 Minuten (konfigurierbar via `SYNC_TIMEOUT_MS` in Millisekunden, Standard: 1800000)
-- Nach Timeout wird der Lock automatisch freigegeben
+- The mutex has an automatic timeout of 30 minutes (configurable through `SYNC_TIMEOUT_MS` in milliseconds, default: 1800000)
+- After the timeout, the lock is released automatically
 
 ## Rollbar-Monitoring
 
-Nach jedem Sync (Erfolg oder Fehler) wird ein strukturierter Log an Rollbar gesendet:
+After every sync, whether successful or failed, a structured log is sent to Rollbar:
 
 ```json
 {
@@ -62,17 +62,17 @@ Nach jedem Sync (Erfolg oder Fehler) wird ein strukturierter Log an Rollbar gese
 }
 ```
 
-### Empfohlene Rollbar-Alerts
+### Recommended Rollbar Alerts
 
-| Bedingung | Schweregrad | Beschreibung |
+| Condition | Severity | Description |
 |-----------|-------------|-------------|
-| `sync.completed` mit `status: "failed"` | Warning | Sync fehlgeschlagen — API-Verbindung oder Datenproblem |
-| `sync.manifest.corrupted` | Warning | Manifest-Datei beschädigt — volle Regenerierung |
-| HTTP 500 auf `/api/sync` | Error | Server-Fehler im Sync-Endpoint |
+| `sync.completed` with `status: "failed"` | Warning | Sync failed — API connectivity or data issue |
+| `sync.manifest.corrupted` | Warning | Manifest file corrupted — full regeneration |
+| HTTP 500 on `/api/sync` | Error | Server error in the sync endpoint |
 
 ## Vercel Cron (Alternative)
 
-Falls auf Vercel deployed, kann ein Cron-Job in `vercel.json` konfiguriert werden:
+If deployed on Vercel, define a cron job in `vercel.json`:
 
 ```json
 {
@@ -85,20 +85,20 @@ Falls auf Vercel deployed, kann ein Cron-Job in `vercel.json` konfiguriert werde
 }
 ```
 
-> **Hinweis:** Vercel Cron sendet GET-Requests. Der Sync-Endpoint erwartet jedoch POST. Für Vercel Cron muss entweder der Endpoint angepasst oder ein separater Cron-Handler erstellt werden.
+> **Note:** Vercel Cron sends GET requests. The sync endpoint expects POST, so either the endpoint must be adapted or a dedicated cron handler must be added.
 
-## Sync-Status prüfen
+## Check Sync Status
 
 ```bash
-# Aktuellen Sync-Status abfragen
+# Query current sync status
 curl -s https://aither.example.com/api/sync \
   -H "Authorization: Bearer $AITHER_ADMIN_TOKEN" \
   | jq .
 ```
 
-Erwartete Responses:
+Expected responses:
 
 | Status | Body |
 |--------|------|
 | **200** | `{ "success": true, "data": { "jobId": "sync-...", "status": "success", "courseId": "cm5abc123", "filesGenerated": 1, "filesSkipped": 0 }, "meta": { "requestId": "req-...", "timestamp": "2026-02-22T..." } }` |
-| **404** | `{ "success": false, "error": { "code": "NO_SYNC_JOB", "message": "No sync operation has been run" }, "meta": { "requestId": "req-...", "timestamp": "2026-02-22T..." } }` — Noch kein Sync ausgeführt |
+| **404** | `{ "success": false, "error": { "code": "NO_SYNC_JOB", "message": "No sync operation has been run" }, "meta": { "requestId": "req-...", "timestamp": "2026-02-22T..." } }` — No sync has been executed yet |

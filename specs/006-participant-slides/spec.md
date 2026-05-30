@@ -40,7 +40,7 @@ Each `<section class="slide">` block is an independent slide template. When a se
 
 ### Mode B — Identifier Distribution
 
-**Trigger**: A `CourseMaterial` template (identified by its `identifier` / Kennung, e.g. `video-analysis`) is linked **multiple times** in the curriculum via `CurriculumTopicMaterial`, AND the template contains collection placeholders, AND does **not** contain `<section class="slide">` tags.
+**Trigger**: A `CourseMaterial` template (identified by its `identifier`, for example `video-analysis`) is linked **multiple times** in the curriculum via `CurriculumTopicMaterial`, AND the template contains collection placeholders, AND does **not** contain `<section class="slide">` tags.
 
 The number of curriculum links for the same material always equals the number of participants (1:1). Each link instance receives one participant's data sequentially:
 
@@ -91,8 +91,8 @@ A course material HTML page either contains `<section class="slide">` blocks (Mo
 
 ```html
 <section class="slide">
-  <h2>Grundlagen der Verhandlungsführung</h2>
-  <p>In diesem Modul lernen Sie die wichtigsten Prinzipien...</p>
+  <h2>Negotiation Fundamentals</h2>
+  <p>In this module you will learn the most important principles...</p>
 </section>
 ```
 
@@ -102,8 +102,8 @@ A course material HTML page either contains `<section class="slide">` blocks (Mo
 
 ```html
 <section class="slide">
-  <h1>Willkommen zum Kurs: {courseTitle}</h1>
-  <p>Level: {courseLevel} | Teilnehmer: {participantCount}</p>
+  <h1>Welcome to the course: {courseTitle}</h1>
+  <p>Level: {courseLevel} | Participants: {participantCount}</p>
 </section>
 ```
 
@@ -114,9 +114,9 @@ A course material HTML page either contains `<section class="slide">` blocks (Mo
 ```html
 <section class="slide">
   <h1>{participant:name}</h1>
-  <p>Absicht: {participant:preparationIntent}</p>
-  <p>Ziel: {participant:desiredResults}</p>
-  <p>Vorgesetzten-Profil: {participant:lineManagerProfile}</p>
+  <p>Intent: {participant:preparationIntent}</p>
+  <p>Goal: {participant:desiredResults}</p>
+  <p>Line manager profile: {participant:lineManagerProfile}</p>
 </section>
 ```
 
@@ -127,26 +127,26 @@ With 6 participants → **6 slides**. The parser recognizes the object type `par
 ```html
 <section class="slide">
   <h1>{courseTitle}</h1>
-  <p>Kursübersicht mit {participantCount} Teilnehmern</p>
+  <p>Course overview with {participantCount} participants</p>
 </section>
 
 <section class="slide">
   <h2>{participant:name}</h2>
-  <p>Vorbereitung: {participant:preparationIntent}</p>
-  <p>Ziel: {participant:desiredResults}</p>
+  <p>Preparation: {participant:preparationIntent}</p>
+  <p>Goal: {participant:desiredResults}</p>
 </section>
 
 <section class="slide">
   <h2>Agenda</h2>
-  <p>Nächste Schritte nach dem Seminar</p>
+  <p>Next steps after the seminar</p>
 </section>
 ```
 
 Result with 3 participants → **5 slides**:
 1. Course overview (scalar section → 1 slide)
-2. Participant Anna Müller (collection section, iteration 1)
-3. Participant Ben Fischer (collection section, iteration 2)
-4. Participant Clara Hofmann (collection section, iteration 3)
+2. Participant Anna Miller (collection section, iteration 1)
+3. Participant Ben Fisher (collection section, iteration 2)
+4. Participant Clara Hoffman (collection section, iteration 3)
 5. Agenda (static section → 1 slide)
 
 ### Example: Mode B — Identifier Distribution (1 Template, 3 Curriculum Links, 3 Participants)
@@ -156,17 +156,17 @@ The template `video-analysis` (a single `CourseMaterial` record) is linked **3 t
 **Template** (`video-analysis`):
 ```html
 <div class="analysis-sheet">
-  <h1>Videoanalyse: {participant:name}</h1>
-  <p>Absicht: {participant:preparationIntent}</p>
-  <p>Ziel: {participant:desiredResults}</p>
+  <h1>Video analysis: {participant:name}</h1>
+  <p>Intent: {participant:preparationIntent}</p>
+  <p>Goal: {participant:desiredResults}</p>
 </div>
 ```
 
-3 participants (Anna Müller, Ben Fischer, Clara Hofmann) →
+3 participants (Anna Miller, Ben Fisher, Clara Hoffman) →
 
-- Instance 1 → Anna Müller's data → `005_video-analysis_anna.html`
-- Instance 2 → Ben Fischer's data → `006_video-analysis_ben.html`
-- Instance 3 → Clara Hofmann's data → `007_video-analysis_clara.html`
+- Instance 1 → Anna Miller's data → `005_video-analysis_anna.html`
+- Instance 2 → Ben Fisher's data → `006_video-analysis_ben.html`
+- Instance 3 → Clara Hoffman's data → `007_video-analysis_clara.html`
 
 → **3 slides**, each with the same layout but different participant data.
 
@@ -191,7 +191,7 @@ As a course instructor, I want slides before the seminar that are automatically 
 Replaced directly with the corresponding value. Produce **one** slide.
 
 ```text
-{courseTitle}          → "Gehaltsverhandlung meistern"
+{courseTitle}          → "Mastering Salary Negotiation"
 {courseLevel}          → "ADVANCED"
 {courseStartDate}      → "2026-03-15T09:00:00Z"
 {participantCount}    → "6"
@@ -202,10 +202,10 @@ Replaced directly with the corresponding value. Produce **one** slide.
 Recognized by the `:` separator. The part before the colon is the **object type** (collection), the part after is the **field**. A section with object placeholders is **repeated for each entity in the collection** — the parser reads the first object type and iterates over all records.
 
 ```text
-{participant:name}              → "Anna Müller"
-{participant:preparationIntent} → "Ich möchte selbstbewusster auftreten"
-{participant:desiredResults}    → "Gehaltserhöhung von 15%"
-{participant:lineManagerProfile}→ "Eher zurückhaltend, datengetrieben"
+{participant:name}              → "Anna Miller"
+{participant:preparationIntent} → "I want to appear more confident"
+{participant:desiredResults}    → "A 15% salary increase"
+{participant:lineManagerProfile}→ "Rather reserved, data-driven"
 ```
 
 **Example:** A `<section class="slide">` template contains:
@@ -213,8 +213,8 @@ Recognized by the `:` separator. The part before the colon is the **object type*
 ```html
 <section class="slide">
   <h1>{participant:name}</h1>
-  <p>Absicht: {participant:preparationIntent}</p>
-  <p>Ziel: {participant:desiredResults}</p>
+  <p>Intent: {participant:preparationIntent}</p>
+  <p>Goal: {participant:desiredResults}</p>
 </section>
 ```
 
@@ -391,8 +391,8 @@ A section may contain both simple and object placeholders:
 - **Output Format**: HTML 1920×1080 via `wrapInLayout()` from `html-layout.ts`
 - **Output Directory**: `output/slides/{courseId}/` (existing)
 - **Styling**: CSS Custom Properties (`--primary-color`, `--text-color`, `--bg-color`) from existing layout
-- **Filename Convention**: All slides use a unified naming scheme: `{NN}_{identifier}[_{firstName}].html`. A global sequence counter (`NN`) determines presentation order. `{NN}` is a zero-padded three-digit decimal (`001`–`999`), implemented as `String(n).padStart(3, '0')` (consistent with 002-course-slides FR-004b). The `identifier` is a slugified descriptor (title, material identifier, or media alt-text). For collection slides (Mode A/B), the participant's normalized first name is appended (see `normalizeFirstName` in research.md R8). Examples: `001_intro.html`, `002_einfuehrung.html`, `005_video-analysis_anna.html`. Alphabetical sort by filename equals presentation order.
-- **firstName Normalization**: The `{firstName}` portion is normalized via `normalizeFirstName()` as defined in research.md R8: Unicode NFKD decomposition → strip diacritics → `ß`→`ss` → ASCII transliteration → lowercase → non-alphanumeric to hyphens → collapse/trim hyphens → truncate to 20 characters (`MAX_FIRST_NAME_LENGTH = 20`). On filename collision, append `_1`, `_2`, etc. until unique.
+- **Filename Convention**: All slides use a unified naming scheme: `{NN}_{identifier}[_{firstName}].html`. A global sequence counter (`NN`) determines presentation order. `{NN}` is a zero-padded three-digit decimal (`001`–`999`), implemented as `String(n).padStart(3, '0')` (consistent with 002-course-slides FR-004b). The `identifier` is a slugified descriptor (title, material identifier, or media alt-text). For collection slides (Mode A/B), the participant's normalized first name is appended (see `normalizeFirstName` in research.md R8). Examples: `001_intro.html`, `002_introduction.html`, `005_video-analysis_anna.html`. Alphabetical sort by filename equals presentation order.
+- **firstName Normalization**: The `{firstName}` portion is normalized via `normalizeFirstName()` as defined in research.md R8: Unicode NFKD decomposition → strip diacritics → map sharp-s to `ss` → ASCII transliteration → lowercase → non-alphanumeric to hyphens → collapse/trim hyphens → truncate to 20 characters (`MAX_FIRST_NAME_LENGTH = 20`). On filename collision, append `_1`, `_2`, etc. until unique.
 - **No Browser Rendering**: Pure HTML files, no Puppeteer/Playwright for PDF
 - **Escaping**: All inserted user data is HTML-escaped (XSS protection)
 - **Materials API Errors**: On error (500, timeout, empty response) from `GET /api/service/courses/{id}/materials`, material slides are skipped. Intro and curriculum slides are generated independently. The error is logged via Rollbar (`slides.materials.fetchError`).

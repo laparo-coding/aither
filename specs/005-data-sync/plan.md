@@ -10,7 +10,7 @@
 Aither fetches **only the next upcoming course** (earliest future `startDate`) from the Hemera Academy Service API, including all participants and their individual preparation data (`preparationIntent`, `desiredResults`, `lineManagerProfile`, `preparationCompletedAt`). Two rendering paths:
 
 1. **Sync Pipeline** (`POST /api/sync`): Fetch courses → select next → fetch course detail with participants → content-hash comparison → generate HTML to `output/` for the fullscreen player. Incremental: unchanged data is skipped.
-2. **Homepage SSR** (`/`): Server-renders the next course + participant tables **live at request time** via `HemeraClient` (not from `output/` files). Two tables: Kursdetails (key-value) + Teilnehmer & Vorbereitungen (columnar).
+2. **Homepage SSR** (`/`): Server-renders the next course + participant tables **live at request time** via `HemeraClient` (not from `output/` files). Two tables: Course Details (key-value) + Participants & Preparations (columnar).
 
 Both paths share the `HemeraClient` and next-course selection logic but produce different outputs (static HTML vs. React SSR).
 
@@ -38,7 +38,7 @@ This is a Hemera change tracked separately but required before participant data 
 If the extended `GET /api/service/courses/[id]` response does not include the expected preparation fields (e.g., Hemera has not yet been updated), the sync pipeline applies graceful degradation:
 
 - **Detection**: After Zod validation, check whether `participants[].preparationIntent` is present. If the response shape matches the pre-extension format (participations without preparation fields), log a `schema.incompatible` Rollbar warning.
-- **Degradation rules**: Missing `preparationIntent`, `desiredResults`, `lineManagerProfile` → default to `null`. Missing `user.name` → default to `"Unbekannt"` (German for "Unknown"). Missing `preparationCompletedAt` → default to `null`.
+- **Degradation rules**: Missing `preparationIntent`, `desiredResults`, `lineManagerProfile` → default to `null`. Missing `user.name` → default to `"Unknown"`. Missing `preparationCompletedAt` → default to `null`.
 - **Monitoring**: A `hemera.schema_mismatch` Rollbar warning event is emitted with the endpoint URL and missing fields. This alerts operators that the Hemera extension is not yet deployed.
 - **Feature flag**: The environment variable `HEMERA_EXTENDED_PARTICIPATION=true|false` (default `true`) controls whether the sync expects preparation fields. When set to `false`, the sync skips preparation-specific rendering and uses simplified participant rows (name + status only). This allows controlled deployment before/after the Hemera change.
 - **Version header**: The `HemeraClient` checks for `X-Hemera-API-Version` in responses (if present) and logs it for debugging. No hard version gating — the fallback logic handles shape mismatches gracefully.
@@ -106,7 +106,7 @@ This policy applies to all `HemeraClient.get()` calls within the sync pipeline a
 | VII | Stateless Architecture (NON-NEGOTIABLE) | PASS | No database. output/ files + transient in-memory sync state. Manifest = flat JSON. |
 | VIII | HTML Playback and Video Recording | PASS | Generated HTML served via fullscreen player. No video in this spec. |
 | IX | Aither Control API | N/A | No player control changes in this feature. |
-| X | Language Policy | PASS | Code/docs in English. Frontend table headers in German (Kursdetails, Teilnehmer). |
+| X | Language Policy | PASS | Code/docs in English. Frontend table headers are documented in English (Course Details, Participants). |
 
 **Gate Result**: ALL PASS. No violations. Proceed to Phase 0.
 

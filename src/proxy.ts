@@ -8,6 +8,22 @@ import { NextResponse } from "next/server";
 
 const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_");
 
+function timingSafeEqualString(left: string, right: string): boolean {
+	const encoder = new TextEncoder();
+	const leftBytes = encoder.encode(left);
+	const rightBytes = encoder.encode(right);
+	const maxLength = Math.max(leftBytes.length, rightBytes.length);
+	let diff = leftBytes.length ^ rightBytes.length;
+
+	for (let index = 0; index < maxLength; index += 1) {
+		const leftByte = leftBytes[index] ?? 0;
+		const rightByte = rightBytes[index] ?? 0;
+		diff |= leftByte ^ rightByte;
+	}
+
+	return diff === 0;
+}
+
 const protectedPatterns = [
 	"/api/sync(.*)",
 	"/api/recordings(.*)",
@@ -40,6 +56,35 @@ function isProtectedPath(pathname: string): boolean {
 	return protectedRegexes.some((re) => re.test(pathname));
 }
 
+function extractBearerToken(req: NextRequest): string | null {
+	const authorization = req.headers.get("authorization");
+	if (!authorization) {
+		return null;
+	}
+
+	const [scheme, token] = authorization.split(" ", 2);
+	if (!scheme || !token || scheme.toLowerCase() !== "bearer") {
+		return null;
+	}
+
+	return token;
+}
+
+export function isAuthorizedSyncServiceRequest(req: NextRequest): boolean {
+	if (req.nextUrl.pathname !== "/api/sync") {
+		return false;
+	}
+
+	const expectedToken = process.env.AITHER_SYNC_TOKEN;
+	const bearerToken = extractBearerToken(req);
+
+	if (!expectedToken || !bearerToken) {
+		return false;
+	}
+
+	return timingSafeEqualString(bearerToken, expectedToken);
+}
+
 // Cache clerk handler promise to deduplicate concurrent initialization
 let _clerkHandlerPromise: Promise<
 	(req: NextRequest, ev: NextFetchEvent) => Promise<Response>
@@ -56,6 +101,10 @@ async function getClerkHandler(): Promise<
 				const isProtectedRoute = createRouteMatcher(protectedPatterns);
 
 				const handler = clerkMiddleware(async (auth, r) => {
+					if (isAuthorizedSyncServiceRequest(r)) {
+						return NextResponse.next();
+					}
+
 					if (isProtectedRoute(r) && !publicPaths.has(r.nextUrl.pathname)) {
 						await auth.protect();
 					}

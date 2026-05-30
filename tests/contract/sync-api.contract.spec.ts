@@ -4,6 +4,7 @@
 // Task: T012 [005-data-sync] — Updated envelope format (success/data/error/meta)
 // ---------------------------------------------------------------------------
 
+import { createHemeraClient } from "@/lib/hemera/factory";
 import {
 	SyncErrorResponseSchema,
 	SyncStartedResponseSchema,
@@ -90,6 +91,8 @@ vi.mock("@/lib/sync/orchestrator", () => ({
 import { GET, POST, _resetState } from "@/app/api/sync/route";
 import { NextRequest } from "next/server";
 
+const mockCreateHemeraClient = vi.mocked(createHemeraClient);
+
 function createRequest(method: string): NextRequest {
 	return new NextRequest(new URL("http://localhost:3000/api/sync"), { method });
 }
@@ -128,6 +131,16 @@ describe("POST /api/sync", () => {
 
 		const parsed = SyncErrorResponseSchema.safeParse(body);
 		expect(parsed.success).toBe(true);
+	});
+
+	it("returns 500 without leaving a stale running sync when initialization fails", async () => {
+		mockCreateHemeraClient.mockRejectedValueOnce(new Error("Hemera down"));
+
+		const failedResponse = await POST(createRequest("POST"));
+		expect(failedResponse.status).toBe(500);
+
+		const nextResponse = await POST(createRequest("POST"));
+		expect(nextResponse.status).toBe(202);
 	});
 });
 

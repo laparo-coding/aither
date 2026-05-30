@@ -109,7 +109,7 @@ interface MaterialCardProps {
 
 **Renders**:
 - `Paper` wrapper with consistent padding
-- Status chip (Generiert / Nicht generiert) with success/default color
+- Status chip (Generated / Not generated) with success/default color
 - Last updated date
 - Slide count
 - `SlideThumbnails` component (when files exist)
@@ -133,12 +133,12 @@ interface ParticipantsListProps {
 ```
 
 **Renders**:
-- `Paper` wrapper with section heading "Teilnehmer & Vorbereitungen"
+- `Paper` wrapper with section heading `Participants & Preparations`
 - MUI `List` with `ListItem` rows
 - Each row: `Avatar` (initials from name) → name → completion status
 - Each `ListItem` is expandable (click/tap toggles detail panel): expanded state reveals preparation intent, desired results, and line manager profile via a collapsible section (`Collapse` or inline expand). `aria-expanded` MUST reflect the current state.
 - **Keyboard interaction**: `Enter` and `Space` on a focused `ListItem` MUST toggle the expanded state (updating `aria-expanded`). When expanding, focus MUST move to the first focusable element inside the `Collapse` panel (or remain on the `ListItem` if no focusable children exist). When collapsing, focus MUST return to the `ListItem` toggle. Arrow keys (`ArrowUp` / `ArrowDown`) SHOULD navigate between `ListItem` rows within the `List`.
-- Empty state: "Keine Teilnehmer." message
+- Empty state: `No participants.` message
 
 **Avatar logic**:
 - Extract first letter of first name + first letter of last name
@@ -148,7 +148,7 @@ interface ParticipantsListProps {
 **Test assertions**:
 - Renders one list item per participant
 - Each item has an Avatar with initials
-- Shows "Keine Teilnehmer." when array is empty
+- Shows `No participants.` when the array is empty
 - Has `data-testid="participants-list"`
 
 ### Section B — SlidesList
@@ -163,10 +163,10 @@ interface SlidesListProps {
 ```
 
 **Renders**:
-- `Paper` wrapper with section heading "Kursfolien"
+- `Paper` wrapper with section heading `Course Slides`
 - MUI `List` with one row per slide file
 - Each row: slide filename, clickable link
-- Empty state: "Keine Folien generiert." message
+- Empty state: `No slides generated.` message
 
 **Test assertions**:
 - Renders one list item per file in `slideStatus.files`
@@ -174,7 +174,7 @@ interface SlidesListProps {
 - Empty state rendered when files is empty
 - Has `data-testid="slides-list"`
 
-### Section C — SteuerungCards
+### Section C — ControlsCards
 
 **File**: `src/app/components/dashboard/section-c-steuerung-cards.tsx`  
 **Type**: Client Component (makes API health checks)
@@ -213,15 +213,15 @@ This ensures a single source of truth for the endpoint list. No hard-coded endpo
 - **Success**: HTTP 2xx sets status to `"OK"` with `Chip color="success"`
 
 **Renders**:
-- Section heading "Steuerung"
+- Section heading `Controls`
 - Grid of `Paper` cards, one per endpoint
-- Each card: endpoint path, HTTP method, status `Chip` (OK / Error / Laden…)
+- Each card: endpoint path, HTTP method, status `Chip` (OK / Error / Loading…)
 - Responsive grid: `{ xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }`
 
 **Test assertions**:
 - Renders cards for all monitored endpoints
 - Each card shows endpoint path and method
-- Status chips show `"Laden…"` before first response
+- Status chips show `Loading…` before the first response
 - Status chips reflect health check results (OK / Error)
 - Error chips have a `Tooltip` with error details
 - Has `data-testid="steuerung-cards"`
@@ -234,12 +234,12 @@ This ensures a single source of truth for the endpoint list. No hard-coded endpo
 No external props — self-contained (embeds existing `CameraSnapshot` component).
 
 **Renders**:
-- `Paper` wrapper with section heading “Kamera”
+- `Paper` wrapper with section heading `Camera`
 - Embedded `CameraSnapshot` component (existing)
 - `data-testid="camera-card"`
 
 **Test assertions**:
-- Renders heading “Kamera”
+- Renders heading `Camera`
 - Contains embedded CameraSnapshot
 - Has `data-testid="camera-card"`
 

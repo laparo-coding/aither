@@ -107,7 +107,7 @@ interface SlidesListProps {
   slideStatus: SlideStatus
 }
 
-/** Section C — Steuerung Cards (no props — self-contained client component) */
+/** Section C — Controls Cards (no props — self-contained client component) */
 // Shared endpoint config + probe result reused with visual restructuring
 
 interface EndpointDef {
@@ -120,7 +120,7 @@ interface EndpointDef {
 }
 
 interface EndpointResult {
-  status: "prüfe" | "erreichbar" | "fehler"
+  status: "checking" | "reachable" | "error"
   code?: number
   probeMethod?: "HEAD" | "GET"
 }
@@ -130,7 +130,7 @@ interface EndpointResult {
 
 Primary data (course detail, slide status) is fetched once at SSR time and rendered statically. Client components manage independent polling and interaction state:
 
-- **SteuerungCards**: Polls endpoints every 10 s; per-endpoint state cycles through `prüfe → erreichbar | fehler` with HEAD→GET fallback.
+- **ControlsCards**: Polls endpoints every 10 s; per-endpoint state cycles through `checking → reachable | error` with HEAD→GET fallback.
 - **CameraSnapshot**: Polls `/api/recording/snapshot` with additive backoff on failure (10 s → 20 s → 30 s cap); resets on success; pauses when tab hidden.
 - **SlideGenerateButton**: Self-contained generation trigger with internal loading/success/error state.
 - **ParticipantsList**: Client-side expand/collapse toggling of participant detail panels.

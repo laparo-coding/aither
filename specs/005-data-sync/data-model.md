@@ -282,15 +282,15 @@ interface CourseDetailTemplateData {
 
 The `course-detail.hbs` template renders two sections:
 
-1. **Kursdetails** — Key-value table with rows: Kurs (title), Slug, Level, Startdatum, Enddatum.
-2. **Teilnehmer & Vorbereitungen** — Columnar table with columns: Name, Vorbereitungsabsicht, Gewünschte Ergebnisse, Vorgesetzten-Profil, Vorbereitung abgeschlossen (Ja/Nein). Null fields display "–".
+1. **Course Details** — Key-value table with rows: Course (title), Slug, Level, Start Date, End Date.
+2. **Participants & Preparations** — Columnar table with columns: Name, Preparation Intent, Desired Results, Line Manager Profile, Preparation Completed (Yes/No). Null fields display "–".
 
 ### Example Template Data (JSON)
 
 ```json
 {
   "course": {
-    "title": "Gehaltsgespräch führen",
+    "title": "Conducting Salary Negotiations",
     "slug": "gehaltsgespraech",
     "level": "INTERMEDIATE",
     "startDate": "15.03.2026",
@@ -299,8 +299,8 @@ The `course-detail.hbs` template renders two sections:
   "participants": [
     {
       "name": "Max Mustermann",
-      "preparationIntent": "Ich möchte lernen, wie ich mein Gehalt verhandle.",
-      "desiredResults": "Eine Gehaltserhöhung von 10%",
+      "preparationIntent": "I want to learn how to negotiate my salary.",
+      "desiredResults": "A 10% salary increase",
       "lineManagerProfile": "Teamleiterin, 5 Jahre Erfahrung",
       "preparationCompleted": true
     },
