@@ -5,6 +5,21 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const mockReadFile = vi.fn();
+const mockReaddir = vi.fn();
+const mockStat = vi.fn();
+
+vi.mock("node:fs/promises", () => ({
+	default: {
+		readFile: (...args: unknown[]) => mockReadFile(...args),
+		readdir: (...args: unknown[]) => mockReaddir(...args),
+		stat: (...args: unknown[]) => mockStat(...args),
+	},
+	readFile: (...args: unknown[]) => mockReadFile(...args),
+	readdir: (...args: unknown[]) => mockReaddir(...args),
+	stat: (...args: unknown[]) => mockStat(...args),
+}));
+
 // Mock loadConfig
 vi.mock("@/lib/config", () => ({
 	loadConfig: vi.fn(() => ({
@@ -67,8 +82,13 @@ function createRequest(): NextRequest {
 	return new NextRequest(new URL("http://localhost:3000/api/slides"), { method: "POST" });
 }
 
+function createGetRequest(url: string): NextRequest {
+	return new NextRequest(new URL(url), { method: "GET" });
+}
+
 describe("POST /api/slides", () => {
 	beforeEach(() => {
+		vi.clearAllMocks();
 		_resetState();
 		mockRequireAdmin.mockReturnValue({
 			status: 200,
@@ -148,5 +168,66 @@ describe("POST /api/slides", () => {
 		// Clean up: resolve the first request
 		resolveGenerate();
 		await promise1;
+	});
+});
+
+describe("Adjacent endpoint regression contracts", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("GET /api/slides/status keeps generated payload shape", async () => {
+		mockReaddir.mockResolvedValue(["slide-1.html", "slide-2.html", "note.txt"]);
+		mockStat.mockResolvedValue({ mtimeMs: Date.parse("2026-05-31T10:00:00.000Z") });
+
+		const { GET } = await import("@/app/api/slides/status/route");
+		const res = await GET(
+			createGetRequest("http://localhost:3000/api/slides/status?courseId=sem-1"),
+		);
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body).toMatchObject({
+			status: "generated",
+			slideCount: 2,
+		});
+		expect(typeof body.lastUpdated).toBe("string");
+		expect(Object.keys(body).sort()).toEqual(["lastUpdated", "slideCount", "status"]);
+	});
+
+	it("GET /api/slides/status keeps not-generated payload shape on invalid input", async () => {
+		const { GET } = await import("@/app/api/slides/status/route");
+		const res = await GET(
+			createGetRequest("http://localhost:3000/api/slides/status?courseId=../../bad"),
+		);
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body).toEqual({ status: "not-generated", slideCount: 0, lastUpdated: null });
+	});
+
+	it("GET /api/slides/view keeps html response contract", async () => {
+		mockReadFile.mockResolvedValue("<html><body>slide</body></html>");
+
+		const { GET } = await import("@/app/api/slides/view/route");
+		const res = await GET(
+			createGetRequest("http://localhost:3000/api/slides/view?courseId=sem-1&file=slide-1.html"),
+		);
+
+		expect(res.status).toBe(200);
+		expect(res.headers.get("content-type")).toContain("text/html");
+		expect(res.headers.get("cache-control")).toBe("no-store");
+		expect(await res.text()).toContain("<html>");
+	});
+
+	it("GET /api/slides/view keeps error payload contract on invalid file", async () => {
+		const { GET } = await import("@/app/api/slides/view/route");
+		const res = await GET(
+			createGetRequest("http://localhost:3000/api/slides/view?courseId=sem-1&file=../../secret"),
+		);
+
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body).toEqual({ error: "Invalid file" });
 	});
 });

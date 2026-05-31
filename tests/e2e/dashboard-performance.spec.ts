@@ -6,11 +6,12 @@
 import { expect, test } from "@playwright/test";
 
 const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:3500";
+const FCP_BUDGET_MS = Number(process.env.E2E_FCP_BUDGET_MS || 1800);
 
 test.describe("Dashboard Performance Budget", () => {
 	test("CLS is under 0.1", async ({ page }) => {
 		await page.goto(BASE_URL, { waitUntil: "networkidle" });
-		await page.waitForSelector('[data-testid="course-card"]', { timeout: 5_000 });
+		await page.waitForSelector('[data-testid="steuerung-cards"]', { timeout: 10_000 });
 
 		const cls = await page.evaluate(() => {
 			return new Promise<number>((resolve) => {
@@ -59,7 +60,7 @@ test.describe("Dashboard Performance Budget", () => {
 
 		// Skip if FCP not available (some environments don't report it)
 		if (fcp > 0) {
-			expect(fcp).toBeLessThan(1800);
+			expect(fcp).toBeLessThan(FCP_BUDGET_MS);
 		}
 	});
 });

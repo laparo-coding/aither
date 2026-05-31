@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: Aither Controller Bridge Endpoints
+  version: 0.1.0
+  description: Contracts for Gaia controller integration.
+servers:
+  - url: http://localhost:3500
+paths:
+  /api/slides/controller:
+    get:
+      summary: Retrieve controller manifest for a course
+      parameters:
+        - in: query
+          name: courseId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Manifest response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManifestSuccessResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Presentation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Slide state unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/slides/controller/navigation:
+    post:
+      summary: Mutate active slide index by previous/next command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NavigationRequest"
+      responses:
+        "200":
+          description: Navigation success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NavigationSuccessResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Presentation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Index conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Slide state unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    ControllerSlideRef:
+      type: object
+      required:
+        - index
+        - fileName
+      properties:
+        index:
+          type: integer
+          minimum: 0
+        fileName:
+          type: string
+        noteTitle:
+          type: string
+        noteBody:
+          type: string
+    ControllerManifest:
+      type: object
+      required:
+        - courseId
+        - presentationId
+        - title
+        - aspectRatio
+        - activeSlideIndex
+        - lastUpdated
+        - slides
+      properties:
+        courseId:
+          type: string
+        presentationId:
+          type: string
+        title:
+          type: string
+        aspectRatio:
+          type: string
+        activeSlideIndex:
+          type: integer
+          minimum: 0
+        lastUpdated:
+          type: string
+          format: date-time
+        slides:
+          type: array
+          items:
+            $ref: "#/components/schemas/ControllerSlideRef"
+    ManifestSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/ControllerManifest"
+    NavigationRequest:
+      type: object
+      required:
+        - presentationId
+        - command
+        - fromIndex
+        - requestId
+      properties:
+        presentationId:
+          type: string
+        command:
+          type: string
+          enum:
+            - previous
+            - next
+        fromIndex:
+          type: integer
+          minimum: 0
+        requestId:
+          type: string
+    NavigationResult:
+      type: object
+      required:
+        - presentationId
+        - activeSlideIndex
+        - fileName
+        - lastUpdated
+      properties:
+        presentationId:
+          type: string
+        activeSlideIndex:
+          type: integer
+          minimum: 0
+        fileName:
+          type: string
+        lastUpdated:
+          type: string
+          format: date-time
+        noteTitle:
+          type: string
+        noteBody:
+          type: string
+    NavigationSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/NavigationResult"
+    ControllerError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: number
+              - type: boolean
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          $ref: "#/components/schemas/ControllerError"
