@@ -69,3 +69,7 @@ output/
 # (duplicate Python block removed — consolidated above)
 .qodo/
 .playwright-mcp/
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
