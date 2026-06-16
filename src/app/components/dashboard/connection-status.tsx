@@ -101,7 +101,16 @@ export function ConnectionStatus({
 	}
 
 	return (
-		<Alert severity="warning" data-testid="connection-status" icon={false} sx={{ mt: 3, mb: 3 }}>
+		<Alert
+			severity="warning"
+			data-testid="connection-status"
+			icon={false}
+			sx={{
+				mt: 3,
+				mb: 3,
+				bgcolor: "common.white",
+			}}
+		>
 			<Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
 				{!gaveUp && <CircularProgress size={18} color="warning" />}
 				<Typography variant="body1" sx={{ fontWeight: 600 }}>
