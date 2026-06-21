@@ -13,7 +13,7 @@ services:
       target: dev
     container_name: aither-dev
     ports:
-      - "3000:3000"
+      - "3500:3000"
     volumes:
       - .:/app
       - /app/node_modules        # node_modules aus dem Image nutzen
