@@ -195,7 +195,15 @@ export function ParticipantsList({ participants, hemeraBaseUrl }: ParticipantsLi
 											}}
 										>
 											<Avatar
-												sx={{ bgcolor: getAvatarColor(participant.name), width: 32, height: 32 }}
+												sx={{
+													bgcolor: getAvatarColor(participant.name),
+													width: 40,
+													height: 40,
+													fontSize: 16,
+													fontWeight: 600,
+													flexShrink: 0,
+													border: "2px solid rgba(255,255,255,0.3)",
+												}}
 											>
 												{getInitials(participant.name)}
 											</Avatar>
