@@ -25,6 +25,7 @@ services:
       - NEXT_TELEMETRY_DISABLED=1
       - WATCHPACK_POLLING=true   # File-Watching in Docker
       - HEMERA_API_BASE_URL=http://host.docker.internal:3000
+      - HEMERA_API_FALLBACK_URL=http://host.docker.internal:3000
     restart: unless-stopped
 
   # ── Prod: Standalone Next.js ───────────────────────────────
