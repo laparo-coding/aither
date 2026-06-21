@@ -22,57 +22,70 @@ interface ProbeResult {
 	error?: string;
 }
 
-async function probeHemera(): Promise<{ result: ProbeResult; status: number }> {
+function collectCandidateBaseUrls(): string[] {
 	const baseUrl = process.env.HEMERA_API_BASE_URL;
-	if (!baseUrl) {
+	const fallbackUrl = process.env.HEMERA_API_FALLBACK_URL;
+	const candidates = [baseUrl, fallbackUrl].filter(
+		(value): value is string => typeof value === "string" && value.trim().length > 0,
+	);
+
+	return Array.from(new Set(candidates));
+}
+
+async function probeHemera(): Promise<{ result: ProbeResult; status: number }> {
+	const candidates = collectCandidateBaseUrls();
+	if (candidates.length === 0) {
 		return {
-			result: { reachable: false, error: "HEMERA_API_BASE_URL not configured" },
+			result: {
+				reachable: false,
+				error: "HEMERA_API_BASE_URL/HEMERA_API_FALLBACK_URL not configured",
+			},
 			status: 502,
 		};
 	}
 
-	try {
-		const apiKey = process.env.HEMERA_API_KEY;
-		const headers: Record<string, string> = { Accept: "application/json" };
-		if (apiKey) {
-			headers["X-API-Key"] = apiKey;
-		}
-		const res = await fetch(`${baseUrl}/api/service/courses`, {
-			method: "GET",
-			headers,
-			signal: AbortSignal.timeout(4_000),
-			cache: "no-store",
-		});
-		const contentType = res.headers.get("content-type") ?? "";
-		const looksLikeJson = contentType.includes("application/json");
-		// 2xx = authenticated OK; 401 = reachable, auth invalid (still valid Hemera).
-		// 404/5xx with HTML = something other than Hemera answered.
-		const looksLikeApi = res.ok || res.status === 401;
-		if (looksLikeApi && looksLikeJson) {
-			return {
-				result: { reachable: true, baseUrl, hemeraStatus: res.status },
-				status: 200,
-			};
-		}
-		return {
-			result: {
-				reachable: false,
-				baseUrl,
-				hemeraStatus: res.status,
-				error: `Unexpected response (status=${res.status}, contentType=${contentType || "none"})`,
-			},
-			status: 502,
-		};
-	} catch (err) {
-		return {
-			result: {
-				reachable: false,
-				baseUrl,
-				error: err instanceof Error ? err.message : String(err),
-			},
-			status: 502,
-		};
+	const apiKey = process.env.HEMERA_API_KEY;
+	const headers: Record<string, string> = { Accept: "application/json" };
+	if (apiKey) {
+		headers["X-API-Key"] = apiKey;
 	}
+
+	let lastError = "Hemera probe failed for all configured URLs";
+
+	for (const baseUrl of candidates) {
+		try {
+			const res = await fetch(`${baseUrl}/api/service/courses`, {
+				method: "GET",
+				headers,
+				signal: AbortSignal.timeout(4_000),
+				cache: "no-store",
+			});
+			const contentType = res.headers.get("content-type") ?? "";
+			const looksLikeJson = contentType.includes("application/json");
+			// 2xx = authenticated OK; 401 = reachable, auth invalid (still valid Hemera).
+			// 404/5xx with HTML = something other than Hemera answered.
+			const looksLikeApi = res.ok || res.status === 401;
+			if (looksLikeApi && looksLikeJson) {
+				return {
+					result: { reachable: true, baseUrl, hemeraStatus: res.status },
+					status: 200,
+				};
+			}
+
+			lastError = `Unexpected response from ${baseUrl} (status=${res.status}, contentType=${contentType || "none"})`;
+		} catch (err) {
+			lastError = err instanceof Error ? err.message : String(err);
+		}
+	}
+
+	return {
+		result: {
+			reachable: false,
+			baseUrl: candidates[0],
+			error: lastError,
+		},
+		status: 502,
+	};
 }
 
 export async function HEAD() {
