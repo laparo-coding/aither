@@ -22,6 +22,9 @@ interface ProbeResult {
 	error?: string;
 }
 
+const PROBE_TIMEOUT_MS = 8_000;
+const PROBE_MAX_ATTEMPTS = 2;
+
 function collectCandidateBaseUrls(): string[] {
 	const baseUrl = process.env.HEMERA_API_BASE_URL;
 	const fallbackUrl = process.env.HEMERA_API_FALLBACK_URL;
@@ -53,28 +56,34 @@ async function probeHemera(): Promise<{ result: ProbeResult; status: number }> {
 	let lastError = "Hemera probe failed for all configured URLs";
 
 	for (const baseUrl of candidates) {
-		try {
-			const res = await fetch(`${baseUrl}/api/service/courses`, {
-				method: "GET",
-				headers,
-				signal: AbortSignal.timeout(4_000),
-				cache: "no-store",
-			});
-			const contentType = res.headers.get("content-type") ?? "";
-			const looksLikeJson = contentType.includes("application/json");
-			// 2xx = authenticated OK; 401 = reachable, auth invalid (still valid Hemera).
-			// 404/5xx with HTML = something other than Hemera answered.
-			const looksLikeApi = res.ok || res.status === 401;
-			if (looksLikeApi && looksLikeJson) {
-				return {
-					result: { reachable: true, baseUrl, hemeraStatus: res.status },
-					status: 200,
-				};
+		for (let attempt = 1; attempt <= PROBE_MAX_ATTEMPTS; attempt += 1) {
+			try {
+				const res = await fetch(`${baseUrl}/api/service/courses`, {
+					method: "GET",
+					headers,
+					signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+					cache: "no-store",
+				});
+				const contentType = res.headers.get("content-type") ?? "";
+				const looksLikeJson = contentType.includes("application/json");
+				// 2xx = authenticated OK; 401 = reachable, auth invalid (still valid Hemera).
+				// 404/5xx with HTML = something other than Hemera answered.
+				const looksLikeApi = res.ok || res.status === 401;
+				if (looksLikeApi && looksLikeJson) {
+					return {
+						result: { reachable: true, baseUrl, hemeraStatus: res.status },
+						status: 200,
+					};
+				}
+
+				lastError = `Unexpected response from ${baseUrl} (status=${res.status}, contentType=${contentType || "none"})`;
+			} catch (err) {
+				lastError = err instanceof Error ? err.message : String(err);
 			}
 
-			lastError = `Unexpected response from ${baseUrl} (status=${res.status}, contentType=${contentType || "none"})`;
-		} catch (err) {
-			lastError = err instanceof Error ? err.message : String(err);
+			if (attempt < PROBE_MAX_ATTEMPTS) {
+				await new Promise((resolve) => setTimeout(resolve, 150));
+			}
 		}
 	}
 
