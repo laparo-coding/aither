@@ -39,6 +39,9 @@ python-env/
 *.swo
 *~
 
+# Rollbar MCP (local token config — keep .example committed)
+.rollbar-mcp.json
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,17 @@
+{
+  "servers": {
+    "rollbar": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@rollbar/mcp-server@latest"],
+      "env": {
+        "ROLLBAR_CONFIG_FILE": "${workspaceFolder}/.rollbar-mcp.json"
+      }
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["${workspaceFolder}/.vscode/context7-mcp.sh", "${workspaceFolder}/.env.local"]
+    }
+  }
+}

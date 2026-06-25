@@ -1,0 +1,12 @@
+{
+  "projects": [
+    {
+      "name": "hemera",
+      "token": "REPLACE_WITH_HEMERA_ROLLBAR_WRITE_TOKEN"
+    },
+    {
+      "name": "aither",
+      "token": "REPLACE_WITH_AITHER_ROLLBAR_WRITE_TOKEN"
+    }
+  ]
+}
