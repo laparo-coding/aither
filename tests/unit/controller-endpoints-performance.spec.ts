@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth/route-auth", () => ({
@@ -41,14 +42,14 @@ function percentile95(values: number[]): number {
 	return sorted[Math.max(0, index)];
 }
 
-function getRequest(courseId: string): Request {
-	return new Request(`http://localhost:3500/api/slides/controller?courseId=${courseId}`, {
+function getRequest(courseId: string): NextRequest {
+	return new NextRequest(`http://localhost:3500/api/slides/controller?courseId=${courseId}`, {
 		method: "GET",
 	});
 }
 
-function postRequest(presentationId: string, fromIndex: number, requestId: string): Request {
-	return new Request("http://localhost:3500/api/slides/controller/navigation", {
+function postRequest(presentationId: string, fromIndex: number, requestId: string): NextRequest {
+	return new NextRequest("http://localhost:3500/api/slides/controller/navigation", {
 		method: "POST",
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify({
