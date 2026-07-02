@@ -88,12 +88,17 @@ export function ParticipantsList({ participants, hemeraBaseUrl }: ParticipantsLi
 		toggleRefs.current[index]?.focus();
 	}, []);
 
-	const handleToggle = useCallback((participationId: string) => {
+	const handleToggle = useCallback((participationId: string | null) => {
+		if (!participationId) return;
 		setExpandedId((current) => (current === participationId ? null : participationId));
 	}, []);
 
 	const handleToggleKeyDown = useCallback(
-		(event: React.KeyboardEvent<HTMLButtonElement>, index: number, participationId: string) => {
+		(
+			event: React.KeyboardEvent<HTMLButtonElement>,
+			index: number,
+			participationId: string | null,
+		) => {
 			switch (event.key) {
 				case "Enter":
 				case " ":

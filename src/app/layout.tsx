@@ -7,6 +7,10 @@ import "./globals.css";
 export const metadata: Metadata = {
 	title: "Aither",
 	description: "Hemera Academy Integration",
+	icons: {
+		icon: "/favicon.png",
+		apple: "/favicon.png",
+	},
 };
 
 export default function RootLayout({

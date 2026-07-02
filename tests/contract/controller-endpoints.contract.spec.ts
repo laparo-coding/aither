@@ -50,13 +50,14 @@ vi.mock("@/lib/slides/controller-navigation", async () => {
 
 import { POST as postNavigation } from "@/app/api/slides/controller/navigation/route";
 import { GET as getController } from "@/app/api/slides/controller/route";
+import { NextRequest } from "next/server";
 
-function manifestRequest(url: string): Request {
-	return new Request(url, { method: "GET" });
+function manifestRequest(url: string): NextRequest {
+	return new NextRequest(url, { method: "GET" });
 }
 
-function navigationRequest(body: unknown): Request {
-	return new Request("http://localhost:3500/api/slides/controller/navigation", {
+function navigationRequest(body: unknown): NextRequest {
+	return new NextRequest("http://localhost:3500/api/slides/controller/navigation", {
 		method: "POST",
 		headers: { "content-type": "application/json" },
 		body: JSON.stringify(body),

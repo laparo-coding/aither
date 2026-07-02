@@ -5,8 +5,8 @@ import sharp from "sharp";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "..", "public");
 
-// Aither uses a dark teal/blue brand color with light text
-const bg = "#1B3A4B";
+// Hemera brand colors: Marsala background with beige text
+const bg = "#884143";
 const fg = "#EBE2D3";
 
 function generateIcon(size) {
