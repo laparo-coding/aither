@@ -22,6 +22,10 @@
       "type": "stdio",
       "command": "npx",
       "args": ["@playwright/mcp@latest"]
+    },
+    "clerk": {
+      "type": "http",
+      "url": "https://mcp.clerk.com/mcp"
     }
   },
   "inputs": [

@@ -13,6 +13,7 @@
 		"test:unit": "vitest run tests/unit/",
 		"test:contract": "vitest run tests/contract/",
 		"test:e2e": "playwright test",
+		"rollbar:keychain": "bash scripts/rollbar-keychain-setup.sh",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
 		"open:code": "code .",
