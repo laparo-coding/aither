@@ -13,6 +13,7 @@
 		"test:unit": "vitest run tests/unit/",
 		"test:contract": "vitest run tests/contract/",
 		"test:e2e": "playwright test",
+		"rollbar:keychain": "bash scripts/rollbar-keychain-setup.sh",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
 		"open:code": "code .",
@@ -57,6 +58,7 @@
 		"jsdom": "^29.0.1",
 		"typescript": "^5.9.3",
 		"vite-tsconfig-paths": "^6.1.0",
-		"vitest": "^3.0.0"
+		"vitest": "^3.0.0",
+		"@vitest/coverage-v8": "^3.0.0"
 	}
 }
