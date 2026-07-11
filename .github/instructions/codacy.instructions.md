@@ -9,7 +9,7 @@ Configuration for AI behavior when interacting with Codacy's MCP Server
 ## using any tool that accepts the arguments: `provider`, `organization`, or `repository`
 - ALWAYS use:
  - provider: gh
- - organization: Laparo-coding
+ - organization: Laparo
  - repository: aither
 - Avoid calling `git remote -v` unless really necessary
 
@@ -58,14 +58,14 @@ Configuration for AI behavior when interacting with Codacy's MCP Server
 - EXAMPLE:
  - After: npm install react-markdown
  - Do: Run codacy_cli_analyze with trivy
- - Before: Continuing with other tasks
+ - Before: Continuing with any other tasks
 
 ## General
 - Repeat the relevant steps for each modified file.
 - "Propose fixes" means to both suggest and, if possible, automatically apply the fixes.
 - You MUST NOT wait for the user to ask for analysis or remind you to run the tool.
 - Do not run `codacy_cli_analyze` looking for changes in duplicated code or code complexity metrics.
-- Complexity metrics are different from complexity issues. When trying to fix complexity in a repository or code file, focus on solving the complexity issues and ignore the complexity metric.
+- Complexity metrics are different from complexity issues. When trying to fix complexity in a repository or file, focus on solving the complexity issues and ignore the complexity metric.
 - Do not run `codacy_cli_analyze` looking for changes in code coverage.
 - Do not try to manually install Codacy CLI using either brew, npm, npx, or any other package manager.
 - If the Codacy CLI is not installed, just run the `codacy_cli_analyze` tool from Codacy's MCP Server.

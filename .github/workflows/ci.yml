@@ -31,6 +31,28 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run tests with coverage
+        run: npx vitest run --coverage
+        env:
+          CI: 'true'
+
+      - name: Upload coverage to Codacy
+        if: always()
+        run: bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage/lcov.info
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+
+      - name: Run Codacy Trivy security scan
+        if: always()
+        run: |
+          set -euo pipefail
+          TRIVY_DB_REPOSITORY=ghcr.io/aquasecurity/trivy-db ./.codacy/cli.sh analyze -t trivy --format sarif -o /tmp/trivy-results.sarif
+          if [ -f /tmp/trivy-results.sarif ]; then
+            echo "Trivy scan complete: $(jq '[.runs[].results[]?] | length' /tmp/trivy-results.sarif) findings"
+          fi
+        env:
+          CODACY_API_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+
   # CodeRabbit runs automatically on PRs via the GitHub App.
   # Install the app at: https://github.com/apps/coderabbitai
   # Configuration: .coderabbit.yaml
