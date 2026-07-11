@@ -6,11 +6,12 @@ PRIMARY_ENV_KEY="ROLLBAR_SERVER_TOKEN"
 PROJECT_NAME="aither"
 KEYCHAIN_SERVICE="rollbar-aither-post-server-item"
 DEFAULT_ENV_FILE=".env.local"
+CURRENT_USER="${USER:-$(id -un 2>/dev/null || echo "$UID")}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/rollbar-keychain-setup.sh [--token TOKEN] [--env-file PATH] [--keychain-service NAME]
+  scripts/rollbar-keychain-setup.sh [--token TOKEN] [--env-file PATH] [--keychain-service NAME] [--non-interactive]
 
 Description:
   1) Liest den Rollbar Server-Token (aither) aus --token, Env oder Env-Datei.
@@ -19,16 +20,25 @@ Description:
 
 Token-Reihenfolge:
   --token > $ROLLBAR_SERVER_TOKEN > Env-Datei > interaktive Eingabe
+
+Optionen:
+  --non-interactive    Keine interaktive Eingabe; Fehler, wenn kein Token gefunden wird.
 EOF
 }
 
+# Strip surrounding quotes and whitespace from a token value.
 trim_token() {
   local value="$1"
-  value="${value#\"}"
-  value="${value%\"}"
-  value="${value#\'}"
-  value="${value%\'}"
-  printf '%s' "$(printf '%s' "$value" | tr -d '[:space:]')"
+  value="$(printf '%s' "$value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  if [[ "$value" == \"*\" ]]; then
+    value="${value#\"}"
+    value="${value%\"}"
+  fi
+  if [[ "$value" == \'*\' ]]; then
+    value="${value#\'}"
+    value="${value%\'}"
+  fi
+  printf '%s' "$value"
 }
 
 read_from_env_file() {
@@ -39,14 +49,15 @@ read_from_env_file() {
   fi
 
   local line
-  line=$(grep -E "^[[:space:]]*${key}=" "$env_file" | tail -n 1 || true)
+  line=$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$env_file" | tail -n 1 || true)
   if [[ -z "$line" ]]; then
     return 1
   fi
 
   local raw
   raw="${line#*=}"
-  raw="${raw%%#*}"
+  # Only strip inline comments preceded by whitespace to avoid truncating # in values
+  raw="${raw%%[[:space:]]#*}"
   trim_token "$raw"
 }
 
@@ -62,22 +73,50 @@ assert_dependencies() {
   fi
 }
 
+# Escape a string for safe inclusion in a JSON string value.
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
 TOKEN=""
 ENV_FILE="$DEFAULT_ENV_FILE"
+NON_INTERACTIVE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --token)
-      TOKEN="${2:-}"
+      if [[ $# -lt 2 ]]; then
+        echo "Fehler: --token erfordert einen Wert." >&2
+        exit 1
+      fi
+      TOKEN="$2"
       shift 2
       ;;
     --env-file)
-      ENV_FILE="${2:-}"
+      if [[ $# -lt 2 ]]; then
+        echo "Fehler: --env-file erfordert einen Wert." >&2
+        exit 1
+      fi
+      ENV_FILE="$2"
       shift 2
       ;;
     --keychain-service)
-      KEYCHAIN_SERVICE="${2:-}"
+      if [[ $# -lt 2 ]]; then
+        echo "Fehler: --keychain-service erfordert einen Wert." >&2
+        exit 1
+      fi
+      KEYCHAIN_SERVICE="$2"
       shift 2
+      ;;
+    --non-interactive)
+      NON_INTERACTIVE="1"
+      shift
       ;;
     -h|--help)
       usage
@@ -106,6 +145,10 @@ if [[ -z "$TOKEN" && -f ".env" ]]; then
 fi
 
 if [[ -z "$TOKEN" ]]; then
+  if [[ -n "$NON_INTERACTIVE" ]]; then
+    echo "Fehler: Kein Token gefunden und --non-interactive gesetzt." >&2
+    exit 1
+  fi
   read -r -s -p "Rollbar post_server_item Token fuer ${PROJECT_NAME} eingeben: " TOKEN
   echo ""
 fi
@@ -117,12 +160,18 @@ if [[ -z "$TOKEN" ]]; then
   exit 1
 fi
 
+escaped_token="$(json_escape "$TOKEN")"
+escaped_project="$(json_escape "$PROJECT_NAME")"
 payload=$(cat <<EOF
-{"access_token":"${TOKEN}","data":{"environment":"development","level":"info","body":{"message":{"body":"${PROJECT_NAME} keychain setup probe"}}}}
+{"access_token":"${escaped_token}","data":{"environment":"development","level":"info","body":{"message":{"body":"${escaped_project} keychain setup probe"}}}}
 EOF
 )
 
-response=$(curl -sS "$ROLLBAR_API_URL" -H "Content-Type: application/json" -d "$payload" || true)
+# Send payload via stdin to avoid exposing the token in process argument lists.
+response=$(curl -sS "$ROLLBAR_API_URL" -H "Content-Type: application/json" --data-binary @- <<EOF || true
+$payload
+EOF
+)
 
 if ! printf '%s' "$response" | tr -d '[:space:]' | grep -q '"err":0'; then
   echo "Fehler: Token-Test fehlgeschlagen." >&2
@@ -130,8 +179,8 @@ if ! printf '%s' "$response" | tr -d '[:space:]' | grep -q '"err":0'; then
   exit 1
 fi
 
-security add-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w "$TOKEN" -U >/dev/null
-stored_token=$(security find-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w)
+security add-generic-password -a "$CURRENT_USER" -s "$KEYCHAIN_SERVICE" -w "$TOKEN" -U >/dev/null
+stored_token=$(security find-generic-password -a "$CURRENT_USER" -s "$KEYCHAIN_SERVICE" -w)
 
 if [[ "$stored_token" != "$TOKEN" ]]; then
   echo "Fehler: Token konnte nicht korrekt aus der Keychain gelesen werden." >&2
@@ -143,4 +192,4 @@ echo "Token wurde in der Keychain gespeichert."
 echo "Service: $KEYCHAIN_SERVICE"
 echo ""
 echo "Optional fuer die aktuelle Shell:"
-echo "export ROLLBAR_SERVER_TOKEN=\"\$(security find-generic-password -a \"$USER\" -s \"$KEYCHAIN_SERVICE\" -w)\""
+echo "export ROLLBAR_SERVER_TOKEN=\"\$(security find-generic-password -a \"$CURRENT_USER\" -s \"$KEYCHAIN_SERVICE\" -w)\""
