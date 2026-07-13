@@ -11,12 +11,12 @@
     "context7": {
       "type": "stdio",
       "command": "bash",
-      "args": ["${workspaceFolder}/.vscode/context7-mcp.sh", "${workspaceFolder}/.env.local"]
+      "args": ["${workspaceFolder}/.vscode/context7-mcp.sh"]
     },
     "codacy": {
       "type": "stdio",
       "command": "bash",
-      "args": ["${workspaceFolder}/.vscode/codacy-mcp.sh", "${workspaceFolder}/.env.local"]
+      "args": ["${workspaceFolder}/.vscode/codacy-mcp.sh"]
     },
     "playwright": {
       "type": "stdio",
