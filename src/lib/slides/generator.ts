@@ -40,7 +40,14 @@ const GERMAN_MAP: Record<string, string> = {
 	Ö: "Oe",
 	Ü: "Ue",
 };
-const GERMAN_RE = new RegExp(`[${Object.keys(GERMAN_MAP).join("")}]`, "g");
+const GERMAN_RE = new RegExp(`[${Object.keys(GERMAN_MAP).map(escapeRegexChar).join("")}]`, "g");
+
+/** Escape a single character for safe use inside a RegExp character class. */
+function escapeRegexChar(ch: string): string {
+	// Characters with special meaning inside a character class
+	if (ch === "\\" || ch === "]" || ch === "^") return `\\${ch}`;
+	return ch;
+}
 
 /** Convert text to a URL/filename-safe slug: lowercase, German transliteration, diacritics stripped, hyphens. */
 function slugify(text: string): string {

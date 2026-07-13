@@ -4,6 +4,7 @@
 // sampling rates, and structured error reporting.
 // ---------------------------------------------------------------------------
 
+import { randomInt } from "node:crypto";
 import Rollbar from "rollbar";
 import { isTelemetryConsentGranted } from "./privacy";
 
@@ -337,8 +338,14 @@ export function reportError(
 		const rateError = readNumberEnv("ROLLBAR_SAMPLE_RATE_ERROR", 1);
 		const rateCritical = readNumberEnv("ROLLBAR_SAMPLE_RATE_CRITICAL", 1);
 
-		const pick = (rate: number) =>
-			Math.random() < Math.max(0, Math.min(1, rate)) && Math.random() < rateAll;
+		const pick = (rate: number) => {
+			// Combined effective rate = rate * rateAll (both must pass)
+			const effective = Math.max(0, Math.min(1, rate)) * Math.max(0, Math.min(1, rateAll));
+			if (effective <= 0) return false;
+			if (effective >= 1) return true;
+			// Cryptographically secure sampling (no Math.random)
+			return randomInt(1, 1_000_001) <= Math.round(effective * 1_000_000);
+		};
 
 		const includePII = isTelemetryConsentGranted();
 		const rollbarContext: Record<string, unknown> = {

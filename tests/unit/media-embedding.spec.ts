@@ -24,14 +24,14 @@ describe("Media Embedding Helpers", () => {
 			expect(result).toContain('alt="Workshop photo"');
 		});
 
-		it("includes onerror fallback handler", () => {
+		it("includes media-fallback CSS class (no inline onerror for XSS safety)", () => {
 			const template = "{{image sourceUrl altText}}";
 			const result = populateTemplate(template, {
 				sourceUrl: "https://hemera.academy/img/photo.jpg",
 				altText: "Photo",
 			});
 
-			expect(result).toContain("onerror");
+			expect(result).not.toContain("onerror");
 			expect(result).toContain("media-fallback");
 		});
 

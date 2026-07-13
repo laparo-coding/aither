@@ -32,8 +32,10 @@ export function registerMediaHelpers(): void {
 	Handlebars.registerHelper("image", (sourceUrl: string, altText: string) => {
 		const safeUrl = Handlebars.Utils.escapeExpression(sourceUrl);
 		const safeAlt = Handlebars.Utils.escapeExpression(altText ?? "");
+		// Build the <img> element without inline event handlers (onerror) to avoid XSS.
+		// The fallback is handled by the consumer via a CSS class.
 		return new Handlebars.SafeString(
-			`<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" onerror="this.outerHTML='<p class=\\'media-fallback\\'>Bild nicht verfügbar</p>'" />`,
+			`<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" class="media-fallback" />`,
 		);
 	});
 

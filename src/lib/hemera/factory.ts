@@ -6,6 +6,7 @@
 
 import { loadConfig } from "../config";
 import { reportError } from "../monitoring/rollbar-official";
+import { isSafeFetchUrl } from "../security/url-validation";
 import { HemeraClient } from "./client";
 import { getTokenManager } from "./token-manager";
 
@@ -212,6 +213,9 @@ async function probeHealthEndpoint(
 	method: ProbeMethod,
 	signal: AbortSignal,
 ): Promise<Response> {
+	if (!isSafeFetchUrl(healthUrl)) {
+		throw new Error(`Blocked unsafe fetch URL: ${healthUrl}`);
+	}
 	return fetch(healthUrl, {
 		method,
 		signal,

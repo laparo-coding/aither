@@ -1,5 +1,6 @@
 "use client";
 
+import { isSameOriginRelativeUrl } from "@/lib/security/url-validation";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -45,6 +46,10 @@ export async function runSnapshotLoadCycle(
 ): Promise<void> {
 	let objectUrl: string | null = null;
 	try {
+		// SSRF prevention: only allow same-origin relative URLs
+		if (!isSameOriginRelativeUrl(url)) {
+			throw new Error("Invalid snapshot URL");
+		}
 		const res = await fetchImpl(url);
 		if (!res.ok) {
 			let msg = `HTTP ${res.status} ${res.statusText}`;

@@ -3,7 +3,7 @@
 // Task: T024 [US1] — SHA-256, sorted keys, atomic read/write
 // ---------------------------------------------------------------------------
 
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { SyncManifest } from "./types";
@@ -52,10 +52,17 @@ export function diffManifest(
 	const unchanged: string[] = [];
 	const deleted: string[] = [];
 
-	// Check new hashes against old
+	// Check new hashes against old using constant-time comparison to avoid timing attacks
 	for (const [key, hash] of Object.entries(newHashes)) {
-		if (oldManifest.hashes[key] === hash) {
-			unchanged.push(key);
+		const oldHash = oldManifest.hashes[key];
+		if (oldHash !== undefined && oldHash.length === hash.length) {
+			const oldBuf = Buffer.from(oldHash, "utf8");
+			const newBuf = Buffer.from(hash, "utf8");
+			if (timingSafeEqual(oldBuf, newBuf)) {
+				unchanged.push(key);
+			} else {
+				changed.push(key);
+			}
 		} else {
 			changed.push(key);
 		}

@@ -27,7 +27,7 @@ export function encryptString(plaintext: string): string {
 	const key = getKey();
 	if (!key) return plaintext;
 	const iv = crypto.randomBytes(12);
-	const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+	const cipher = crypto.createCipheriv("aes-256-gcm", key, iv, { authTagLength: 16 });
 	const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
 	const tag = cipher.getAuthTag();
 	const out = Buffer.concat([iv, tag, ciphertext]);
@@ -45,7 +45,7 @@ export function decryptString(maybeEncrypted: string): string {
 	const iv = b.subarray(0, 12);
 	const tag = b.subarray(12, 28);
 	const ciphertext = b.subarray(28);
-	const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+	const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv, { authTagLength: 16 });
 	decipher.setAuthTag(tag);
 	const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 	return plain.toString("utf8");
