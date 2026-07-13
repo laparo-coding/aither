@@ -20,7 +20,7 @@
 		"prepare": "husky install"
 	},
 	"dependencies": {
-		"@clerk/nextjs": "^6.12.0",
+		"@clerk/nextjs": "^6.39.3",
 		"@emotion/cache": "^11.14.0",
 		"@emotion/react": "^11.14.0",
 		"@emotion/styled": "^11.14.0",
@@ -29,15 +29,15 @@
 		"@mux/mux-node": "^12.8.1",
 		"@upstash/context7-sdk": "^0.3.0",
 		"@upstash/redis": "^1.36.2",
-		"handlebars": "^4.7.8",
-		"next": "^16.1.6",
-		"nodemailer": "^6.9.16",
+		"handlebars": "^4.7.9",
+		"next": "^16.2.6",
+		"nodemailer": "^9.0.1",
 		"p-retry": "^6.2.1",
 		"p-throttle": "^6.2.0",
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"rollbar": "^2.26.5",
-		"uuid": "^11.0.5",
+		"uuid": "^11.1.1",
 		"zod": "^3.24.0"
 	},
 	"devDependencies": {
@@ -49,7 +49,7 @@
 		"@testing-library/react": "^16.3.2",
 		"@testing-library/user-event": "^14.6.1",
 		"@types/node": "^24.0.0",
-		"@types/nodemailer": "^6.4.17",
+		"@types/nodemailer": "^7.0.0",
 		"@types/react": "^19.0.0",
 		"@types/react-dom": "^19.0.0",
 		"@types/uuid": "^10.0.0",
@@ -60,5 +60,10 @@
 		"vite-tsconfig-paths": "^6.1.0",
 		"vitest": "^3.0.0",
 		"@vitest/coverage-v8": "^3.0.0"
+	},
+	"overrides": {
+		"form-data": "^4.0.6",
+		"postcss": "^8.5.10",
+		"yaml": "^2.8.3"
 	}
 }

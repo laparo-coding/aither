@@ -4,6 +4,7 @@
 
 import { loadConfig } from "../config";
 import { reportError } from "../monitoring/rollbar-official";
+import { isSafeFetchUrl } from "../security/url-validation";
 
 const isProduction = process.env.NODE_ENV === "production";
 const HEMERA_HEALTH_PATH = "/api/service/courses";
@@ -94,6 +95,9 @@ function orderedCandidates(primaryUrl: string, fallbackUrl?: string): string[] {
 }
 
 async function probe(url: string, method: ProbeMethod, signal: AbortSignal): Promise<Response> {
+	if (!isSafeFetchUrl(url)) {
+		throw new Error(`Blocked unsafe fetch URL: ${url}`);
+	}
 	return fetch(url, {
 		method,
 		signal,

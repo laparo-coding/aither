@@ -30,6 +30,12 @@ COPY . .
 # Next.js Telemetrie deaktivieren
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Run as non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    chown -R nextjs:nodejs /app
+USER nextjs
+
 EXPOSE 3000
 
 CMD ["npm", "run", "dev", "--", "-p", "3000"]

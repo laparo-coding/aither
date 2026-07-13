@@ -3,6 +3,7 @@
 // Ported from hemera — RFC4122 v4 UUID generation with fallback chain
 // ---------------------------------------------------------------------------
 
+import { randomBytes } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 interface GlobalWithCrypto {
@@ -29,7 +30,7 @@ export function generateRequestId(): string {
 		// fall through to fallback
 	}
 
-	// Fallback: RFC4122 v4 using crypto.getRandomValues if available, else Math.random
+	// Fallback: RFC4122 v4 using crypto.getRandomValues if available, else node:crypto randomBytes
 	const getBytes = (): Uint8Array => {
 		if (
 			typeof globalThis !== "undefined" &&
@@ -40,9 +41,8 @@ export function generateRequestId(): string {
 			(globalThis as GlobalWithCrypto).crypto?.getRandomValues?.(buf);
 			return buf;
 		}
-		const buf = new Uint8Array(16);
-		for (let i = 0; i < 16; i++) buf[i] = (Math.random() * 256) & 0xff;
-		return buf;
+		// Cryptographically secure fallback (no Math.random)
+		return randomBytes(16);
 	};
 
 	const b = getBytes();
