@@ -3,9 +3,6 @@ runtimes:
     - python@3.11.11
 tools:
     - biome@1.9.0
-    - dartanalyzer@3.7.2
     - lizard@1.17.31
     - opengrep@1.16.4
-    - pylint@3.3.6
-    - revive@1.7.0
     - trivy@0.69.3
