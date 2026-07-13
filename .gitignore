@@ -34,6 +34,8 @@ python-env/
 # IDE
 .vscode/
 !.vscode/mcp.json
+!.vscode/codacy-mcp.sh
+!.vscode/context7-mcp.sh
 .idea/
 *.swp
 *.swo
