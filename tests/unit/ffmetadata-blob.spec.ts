@@ -15,6 +15,7 @@ vi.mock("@/lib/config", () => ({
 vi.mock("@vercel/blob", () => ({
 	put: vi.fn(),
 	head: vi.fn(),
+	get: vi.fn(),
 }));
 
 describe("writeFFMetadata", () => {
@@ -78,16 +79,26 @@ describe("readFFMetadata", () => {
 	});
 
 	it("returns { doc: null, corrupt: true } for invalid JSON", async () => {
-		const { head } = await import("@vercel/blob");
+		const { get, head } = await import("@vercel/blob");
 		vi.mocked(head).mockResolvedValue({
 			url: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json",
 			downloadUrl: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json?download=1",
+			etag: '"etag-1"',
 		} as Awaited<ReturnType<typeof head>>);
 
-		global.fetch = vi.fn().mockResolvedValue({
-			ok: true,
-			text: () => Promise.resolve("{ invalid json"),
-		});
+		vi.mocked(get).mockResolvedValue({
+			blob: {
+				pathname: "ffmetadata/rec_test.json",
+			} as never,
+			headers: new Headers(),
+			statusCode: 200,
+			stream: new ReadableStream({
+				start(controller) {
+					controller.enqueue(new TextEncoder().encode("{ invalid json"));
+					controller.close();
+				},
+			}),
+		} as Awaited<ReturnType<typeof get>>);
 
 		const { readFFMetadata } = await import("@/lib/recording/ffmetadata-blob");
 		const result = await readFFMetadata("rec_test");
@@ -95,16 +106,47 @@ describe("readFFMetadata", () => {
 		expect(result.corrupt).toBe(true);
 	});
 
-	it("rejects blob reads from unexpected download hosts", async () => {
-		const { head } = await import("@vercel/blob");
+	it("reads private blobs via the blob sdk with cache bypass", async () => {
+		const { get, head } = await import("@vercel/blob");
 		vi.mocked(head).mockResolvedValue({
 			url: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json",
-			downloadUrl: "https://example.com/ffmetadata/rec_test.json",
+			downloadUrl: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json?download=1",
+			etag: '"etag-2"',
 		} as Awaited<ReturnType<typeof head>>);
 
-		const { BlobStorageError, readFFMetadata } = await import("@/lib/recording/ffmetadata-blob");
+		vi.mocked(get).mockResolvedValue({
+			blob: {
+				pathname: "ffmetadata/rec_test.json",
+			} as never,
+			headers: new Headers(),
+			statusCode: 200,
+			stream: new ReadableStream({
+				start(controller) {
+					controller.enqueue(
+						new TextEncoder().encode(
+							JSON.stringify({
+								metadata: { title: "rec_test", encoder: "aither-ffmetadata" },
+								chapters: [{ id: 0, start: 0, end: 0, title: "Chapter 1" }],
+							}),
+						),
+					);
+					controller.close();
+				},
+			}),
+		} as Awaited<ReturnType<typeof get>>);
 
-		await expect(readFFMetadata("rec_test")).rejects.toThrow(BlobStorageError);
-		expect(global.fetch).not.toHaveBeenCalled();
+		const { readFFMetadata } = await import("@/lib/recording/ffmetadata-blob");
+		const result = await readFFMetadata("rec_test");
+
+		expect(result.corrupt).toBe(false);
+		expect(result.doc?.metadata.title).toBe("rec_test");
+		expect(get).toHaveBeenCalledWith(
+			"ffmetadata/rec_test.json",
+			expect.objectContaining({
+				access: "private",
+				ifNoneMatch: '"etag-2"',
+				useCache: false,
+			}),
+		);
 	});
 });

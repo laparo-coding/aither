@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { loadConfig } from "@/lib/config";
-import { head, put } from "@vercel/blob";
+import { get, head, put } from "@vercel/blob";
 import { FFMetadataJSONSchema } from "./schemas";
 import type { FFMetadataJSON } from "./types";
 
@@ -24,10 +24,6 @@ export class BlobStorageError extends Error {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BLOB_TIMEOUT_MS = 15_000;
-const ALLOWED_BLOB_DOWNLOAD_HOST_SUFFIXES = [
-	"blob.vercel-storage.com",
-	"public.blob.vercel-storage.com",
-];
 
 /**
  * Race a promise against a timeout. For write operations (put), the caller
@@ -83,34 +79,6 @@ function getToken(): string {
 	return token;
 }
 
-function getTrustedBlobDownloadUrl(downloadUrl: string, expectedPath: string): URL {
-	let parsed: URL;
-	try {
-		parsed = new URL(downloadUrl);
-	} catch {
-		throw new BlobStorageError("fetch failed: invalid blob download URL");
-	}
-
-	if (parsed.protocol !== "https:") {
-		throw new BlobStorageError("fetch failed: blob download URL must use https");
-	}
-
-	const hostname = parsed.hostname.toLowerCase();
-	const isAllowedHost = ALLOWED_BLOB_DOWNLOAD_HOST_SUFFIXES.some(
-		(suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
-	);
-	if (!isAllowedHost) {
-		throw new BlobStorageError("fetch failed: untrusted blob download host");
-	}
-
-	const normalizedPath = parsed.pathname.replace(/^\/+/, "");
-	if (normalizedPath !== expectedPath) {
-		throw new BlobStorageError("fetch failed: unexpected blob download path");
-	}
-
-	return parsed;
-}
-
 // ── Public API ─────────────────────────────────────────────────────────────
 
 /** Returns the deterministic blob path for a given asset id. */
@@ -146,24 +114,29 @@ export async function readFFMetadata(assetId: string): Promise<ReadResult> {
 		return { doc: null, corrupt: false };
 	}
 
-	// Fetch the blob content via authenticated downloadUrl (private blobs)
-	const trustedDownloadUrl = getTrustedBlobDownloadUrl(blobInfo.downloadUrl, path);
-	let response: Response;
+	// Fetch the blob content via the Blob SDK so private reads stay authenticated
+	// and the pathname remains constrained to the expected store path.
+	let blobResult: Awaited<ReturnType<typeof get>>;
 	try {
-		response = await withTimeout(
-			fetch(trustedDownloadUrl, { cache: "no-store" }),
+		blobResult = await withTimeout(
+			get(path, {
+				access: "private",
+				ifNoneMatch: blobInfo.etag,
+				token,
+				useCache: false,
+			}),
 			BLOB_TIMEOUT_MS,
-			"fetch",
+			"get",
 		);
 	} catch (err) {
-		throw new BlobStorageError(`fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+		throw new BlobStorageError(`get failed: ${err instanceof Error ? err.message : String(err)}`);
 	}
 
-	if (!response.ok) {
-		throw new BlobStorageError(`fetch returned ${response.status}`);
+	if (!blobResult) {
+		return { doc: null, corrupt: false };
 	}
 
-	const text = await response.text();
+	const text = await new Response(blobResult.stream).text();
 	let json: unknown;
 	try {
 		json = JSON.parse(text);
