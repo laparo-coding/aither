@@ -81,6 +81,7 @@ describe("readFFMetadata", () => {
 		const { head } = await import("@vercel/blob");
 		vi.mocked(head).mockResolvedValue({
 			url: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json",
+			downloadUrl: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json?download=1",
 		} as Awaited<ReturnType<typeof head>>);
 
 		global.fetch = vi.fn().mockResolvedValue({
@@ -92,5 +93,18 @@ describe("readFFMetadata", () => {
 		const result = await readFFMetadata("rec_test");
 		expect(result.doc).toBeNull();
 		expect(result.corrupt).toBe(true);
+	});
+
+	it("rejects blob reads from unexpected download hosts", async () => {
+		const { head } = await import("@vercel/blob");
+		vi.mocked(head).mockResolvedValue({
+			url: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json",
+			downloadUrl: "https://example.com/ffmetadata/rec_test.json",
+		} as Awaited<ReturnType<typeof head>>);
+
+		const { BlobStorageError, readFFMetadata } = await import("@/lib/recording/ffmetadata-blob");
+
+		await expect(readFFMetadata("rec_test")).rejects.toThrow(BlobStorageError);
+		expect(global.fetch).not.toHaveBeenCalled();
 	});
 });

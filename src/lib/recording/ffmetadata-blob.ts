@@ -24,6 +24,10 @@ export class BlobStorageError extends Error {
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const BLOB_TIMEOUT_MS = 15_000;
+const ALLOWED_BLOB_DOWNLOAD_HOST_SUFFIXES = [
+	"blob.vercel-storage.com",
+	"public.blob.vercel-storage.com",
+];
 
 /**
  * Race a promise against a timeout. For write operations (put), the caller
@@ -79,6 +83,34 @@ function getToken(): string {
 	return token;
 }
 
+function getTrustedBlobDownloadUrl(downloadUrl: string, expectedPath: string): URL {
+	let parsed: URL;
+	try {
+		parsed = new URL(downloadUrl);
+	} catch {
+		throw new BlobStorageError("fetch failed: invalid blob download URL");
+	}
+
+	if (parsed.protocol !== "https:") {
+		throw new BlobStorageError("fetch failed: blob download URL must use https");
+	}
+
+	const hostname = parsed.hostname.toLowerCase();
+	const isAllowedHost = ALLOWED_BLOB_DOWNLOAD_HOST_SUFFIXES.some(
+		(suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
+	);
+	if (!isAllowedHost) {
+		throw new BlobStorageError("fetch failed: untrusted blob download host");
+	}
+
+	const normalizedPath = parsed.pathname.replace(/^\/+/, "");
+	if (normalizedPath !== expectedPath) {
+		throw new BlobStorageError("fetch failed: unexpected blob download path");
+	}
+
+	return parsed;
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────
 
 /** Returns the deterministic blob path for a given asset id. */
@@ -115,10 +147,11 @@ export async function readFFMetadata(assetId: string): Promise<ReadResult> {
 	}
 
 	// Fetch the blob content via authenticated downloadUrl (private blobs)
+	const trustedDownloadUrl = getTrustedBlobDownloadUrl(blobInfo.downloadUrl, path);
 	let response: Response;
 	try {
 		response = await withTimeout(
-			fetch(blobInfo.downloadUrl, { cache: "no-store" }),
+			fetch(trustedDownloadUrl, { cache: "no-store" }),
 			BLOB_TIMEOUT_MS,
 			"fetch",
 		);
