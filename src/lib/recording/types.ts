@@ -5,6 +5,8 @@
 
 import type { z } from "zod";
 import type {
+	FFMetadataChapterSchema,
+	FFMetadataJSONSchema,
 	MuxUploadRequestSchema,
 	MuxUploadResponseSchema,
 	PlaybackCommandSchema,
@@ -21,6 +23,8 @@ import type {
 	SeekCommandSchema,
 	StartRecordingResponseSchema,
 	StopRecordingResponseSchema,
+	TimestampIngestionResultSchema,
+	TimestampRequestSchema,
 } from "./schemas";
 
 // ── Enum Types ────────────────────────────────────────────────────────────
@@ -50,6 +54,13 @@ export type RecordingStatusInactive = z.infer<typeof RecordingStatusInactiveSche
 export type RecordingListResponse = z.infer<typeof RecordingListResponseSchema>;
 export type PlaybackResponse = z.infer<typeof PlaybackResponseSchema>;
 export type MuxUploadResponse = z.infer<typeof MuxUploadResponseSchema>;
+
+// ── Timestamp Endpoint Types (Spec 009) ───────────────────────────────────
+
+export type TimestampRequest = z.infer<typeof TimestampRequestSchema>;
+export type FFMetadataChapter = z.infer<typeof FFMetadataChapterSchema>;
+export type FFMetadataJSON = z.infer<typeof FFMetadataJSONSchema>;
+export type TimestampIngestionResult = z.infer<typeof TimestampIngestionResultSchema>;
 
 // ── SSE Types ─────────────────────────────────────────────────────────────
 

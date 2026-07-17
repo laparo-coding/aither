@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: Aither Uranos Timestamp Endpoint
+  version: 0.1.0
+  description: >
+    Contract for the Uranos timestamp ingestion endpoint. Uranos periodically
+    posts a unix timestamp; Aither appends an ffmpeg chapter to the active
+    recording's ffmetadata JSON and upserts it to Vercel Blob Storage.
+servers:
+  - url: http://localhost:3001
+    description: Aither dev server
+paths:
+  /api/recording/timestamp:
+    post:
+      summary: Ingest a unix timestamp as a chapter for the active recording
+      security:
+        - uranosBearer: []
+        - adminSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimestampRequest"
+      responses:
+        "200":
+          description: Timestamp accepted; chapter created/appended and blob upserted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionSuccessResponse"
+        "400":
+          description: Invalid body, timestamp before recording start, or non-monotonic timestamp.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid bearer token (and no admin session).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Authenticated non-admin session without a valid service token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No active recording session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limit exceeded (>60 requests/minute per authenticated identity).
+          headers:
+            Retry-After:
+              description: Seconds until the rate-limit window resets.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Vercel Blob Storage write failed or BLOB_READ_WRITE_TOKEN missing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Unexpected internal error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    uranosBearer:
+      type: http
+      scheme: bearer
+      description: >
+        Bearer token compared timing-safely against URANOS_SYNC_TOKEN. An
+        admin Clerk session is accepted as a fallback (mirrors requireSyncAccess).
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: __client_uat
+      description: >
+        Admin Clerk session cookie. Used as an alternative to the bearer token
+        when no Authorization header is provided. The endpoint validates the
+        session's role via Clerk and accepts only admin users.
+  schemas:
+    TimestampRequest:
+      type: object
+      required: [timestamp]
+      properties:
+        timestamp:
+          type: integer
+          minimum: 1
+          description: Unix epoch in seconds (positive integer).
+          example: 1720866600
+    IngestionSuccessResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/TimestampIngestionResult"
+        meta:
+          $ref: "#/components/schemas/Meta"
+    TimestampIngestionResult:
+      type: object
+      required: [assetId, chapterId, blobKey]
+      properties:
+        assetId:
+          type: string
+          example: rec_2026-07-13T10-30-00Z
+        chapterId:
+          type: integer
+          minimum: 0
+          example: 1
+        blobKey:
+          type: string
+          description: Deterministic blob path in Vercel Blob Storage (not a publicly accessible URL).
+          example: ffmetadata/rec_2026-07-13T10-30-00Z.json
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - INVALID_TIMESTAMP
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NO_ACTIVE_RECORDING
+                - TOO_MANY_REQUESTS
+                - BLOB_STORAGE_UNAVAILABLE
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+    Meta:
+      type: object
+      properties:
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string

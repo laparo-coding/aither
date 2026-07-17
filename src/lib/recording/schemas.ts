@@ -127,3 +127,32 @@ export const MuxUploadResponseSchema = z.object({
 	transmitted: z.boolean(),
 	transmissionError: z.string().nullable().optional(),
 });
+
+// ── Timestamp Endpoint Schemas (Spec 009) ─────────────────────────────────
+
+export const TimestampRequestSchema = z.object({
+	timestamp: z.number().int().positive(),
+});
+
+export const FFMetadataChapterSchema = z
+	.object({
+		id: z.number().int().min(0),
+		start: z.number().int().min(0),
+		end: z.number().int().min(0),
+		title: z.string().min(1),
+	})
+	.refine((c) => c.end >= c.start, { message: "end must be >= start" });
+
+export const FFMetadataJSONSchema = z.object({
+	metadata: z.object({
+		title: z.string().min(1),
+		encoder: z.literal("aither-ffmetadata"),
+	}),
+	chapters: z.array(FFMetadataChapterSchema).min(1, "chapters must contain at least one entry"),
+});
+
+export const TimestampIngestionResultSchema = z.object({
+	assetId: z.string().min(1),
+	chapterId: z.number().int().min(0),
+	blobKey: z.string().min(1),
+});

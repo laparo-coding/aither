@@ -141,6 +141,17 @@ const EnvSchema = z
 		MUX_TOKEN_ID: z.string().optional(),
 		MUX_TOKEN_SECRET: z.string().optional(),
 
+		// Vercel Blob Storage — ffmetadata sidecar (Spec 009, optional at boot)
+		BLOB_READ_WRITE_TOKEN: z.string().optional(),
+
+		// Uranos service token — timestamp endpoint auth (Spec 009, optional at boot)
+		URANOS_SYNC_TOKEN: z
+			.string()
+			.optional()
+			.refine((val) => val === undefined || val.length >= 32, {
+				message: "URANOS_SYNC_TOKEN must be at least 32 characters when provided",
+			}),
+
 		// Notification recipient (distinct from SMTP_FROM)
 		SMTP_TO: z.string().email().optional(),
 	})

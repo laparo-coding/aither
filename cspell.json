@@ -28,6 +28,7 @@
 		"uuidv",
 		"ciphertext",
 		"unauthorised",
+		"upserts",
 		"codacy",
 		"Codacy",
 		"participations",
@@ -152,7 +153,11 @@
 		"virtualenv",
 		"webp",
 		"Ännä",
-		"äöüß"
+		"äöüß",
+		"ffmetadata",
+		"uranos",
+		"Uranos",
+		"URANOS"
 	],
 	"ignorePaths": [
 		"node_modules",
