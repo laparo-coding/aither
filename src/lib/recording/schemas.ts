@@ -156,3 +156,90 @@ export const TimestampIngestionResultSchema = z.object({
 	chapterId: z.number().int().min(0),
 	blobKey: z.string().min(1),
 });
+
+// ── Chapter Endpoint Schemas (Spec 010) ────────────────────────────────────
+
+/** Individual chapter metadata extracted from the MUX chaptered asset. */
+export const ChapterSummarySchema = z
+	.object({
+		id: z.number().int().min(0),
+		start: z.number().min(0).finite(),
+		end: z.number().finite(),
+		title: z.string().min(1).max(255),
+	})
+	.refine((data) => data.end > data.start, {
+		message: "end must be greater than start",
+		path: ["end"],
+	});
+
+/** Response body for GET /api/recording/chapters/[id]. */
+export const ChapterListResponseSchema = z.object({
+	assetId: z.string().min(1),
+	chapters: z
+		.array(ChapterSummarySchema)
+		.min(1)
+		.superRefine((chapters, ctx) => {
+			for (let i = 0; i < chapters.length; i++) {
+				if (chapters[i].id !== i) {
+					ctx.addIssue({
+						code: z.ZodIssueCode.custom,
+						message: "chapter ids must be continuous and zero-based",
+						path: [i, "id"],
+					});
+				}
+
+				if (i < chapters.length - 1 && chapters[i].end > chapters[i + 1].start) {
+					ctx.addIssue({
+						code: z.ZodIssueCode.custom,
+						message: "chapters must not overlap and must be ordered by time",
+						path: [i + 1, "start"],
+					});
+				}
+			}
+		}),
+});
+
+/** Response body for POST /api/recording/chapters/[id] (regenerate). */
+export const ChapterRegenerationResultSchema = z.object({
+	assetId: z.string().min(1),
+	muxAssetId: z.string().min(1),
+	chapterCount: z.number().int().min(1),
+});
+
+/** Request body for extended POST /api/recording/playback/play. */
+export const ChapterPlaybackRequestSchema = z.object({
+	recordingId: z.string().min(1),
+	chapterId: z.number().int().min(0).optional(),
+});
+
+/** Response body for extended POST /api/recording/playback/play. */
+export const ChapterPlaybackResultSchema = z
+	.object({
+		accepted: z.literal(true),
+		chapterId: z.number().int().min(0).optional(),
+		start: z.number().min(0).finite().optional(),
+		end: z.number().finite().optional(),
+	})
+	.refine(
+		(data) => {
+			const hasChapterId = data.chapterId !== undefined;
+			const hasStart = data.start !== undefined;
+			const hasEnd = data.end !== undefined;
+			return (hasChapterId && hasStart && hasEnd) || (!hasChapterId && !hasStart && !hasEnd);
+		},
+		{
+			message: "chapterId, start, and end must be provided together",
+			path: ["chapterId"],
+		},
+	)
+	.refine((data) => data.start === undefined || data.end === undefined || data.end > data.start, {
+		message: "end must be greater than start",
+		path: ["end"],
+	});
+
+/** SSE event payload emitted when the player reaches a chapter boundary. */
+export const ChapterBoundaryEventSchema = z.object({
+	chapterId: z.number().int().min(0),
+	nextChapterId: z.number().int().min(0).optional(),
+	timestamp: z.number().int().optional(),
+});
