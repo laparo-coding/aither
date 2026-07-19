@@ -213,29 +213,24 @@ export const ChapterPlaybackRequestSchema = z.object({
 });
 
 /** Response body for extended POST /api/recording/playback/play. */
-export const ChapterPlaybackResultSchema = z
-	.object({
-		accepted: z.literal(true),
-		chapterId: z.number().int().min(0).optional(),
-		start: z.number().min(0).finite().optional(),
-		end: z.number().finite().optional(),
-	})
-	.refine(
-		(data) => {
-			const hasChapterId = data.chapterId !== undefined;
-			const hasStart = data.start !== undefined;
-			const hasEnd = data.end !== undefined;
-			return (hasChapterId && hasStart && hasEnd) || (!hasChapterId && !hasStart && !hasEnd);
-		},
-		{
-			message: "chapterId, start, and end must be provided together",
-			path: ["chapterId"],
-		},
-	)
-	.refine((data) => data.start === undefined || data.end === undefined || data.end > data.start, {
-		message: "end must be greater than start",
-		path: ["end"],
-	});
+export const ChapterPlaybackResultSchema = z.union([
+	z
+		.object({
+			accepted: z.literal(true),
+		})
+		.strict(),
+	z
+		.object({
+			accepted: z.literal(true),
+			chapterId: z.number().int().min(0),
+			start: z.number().min(0).finite(),
+			end: z.number().finite(),
+		})
+		.refine((data) => data.end > data.start, {
+			message: "end must be greater than start",
+			path: ["end"],
+		}),
+]);
 
 /** SSE event payload emitted when the player reaches a chapter boundary. */
 export const ChapterBoundaryEventSchema = z.object({

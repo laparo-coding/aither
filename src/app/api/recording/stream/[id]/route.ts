@@ -35,7 +35,13 @@ function isAllowedMuxPlaybackUrl(urlString: string): boolean {
 		}
 
 		const subdomain = hostMatch[1].toLowerCase();
-		return ALLOWED_MUX_PLAYBACK_SUBDOMAINS.has(subdomain);
+		if (!ALLOWED_MUX_PLAYBACK_SUBDOMAINS.has(subdomain)) {
+			return false;
+		}
+
+		// Only accept MP4 playback URLs (endpoint serves video/mp4 with Range support)
+		const pathname = parsed.pathname.toLowerCase();
+		return pathname.endsWith(".mp4") || pathname.includes("/direct.mp4");
 	} catch {
 		return false;
 	}

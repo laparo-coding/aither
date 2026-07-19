@@ -73,8 +73,8 @@ get_line_coverage() {
   done < "$lcov_file"
 
   if [[ "$found_lines" -eq 0 ]]; then
-    echo "N/A"
-    return 0
+    echo "0%"
+    return 1
   fi
 
   local pct

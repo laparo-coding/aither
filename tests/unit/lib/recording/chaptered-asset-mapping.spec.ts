@@ -26,7 +26,7 @@ vi.mock("@/lib/config", () => ({
 const VALID_MAPPING = {
 	assetId: "rec_2025-01-15T10-30-00Z",
 	muxAssetId: "mux_asset_abc123",
-	muxPlaybackUrl: "https://stream.mux.com/mux_asset_abc123.m3u8",
+	muxPlaybackUrl: "https://stream.mux.com/mux_asset_abc123.mp4",
 	chapterCount: 5,
 	generatedAt: "2025-01-15T10:35:00Z",
 };

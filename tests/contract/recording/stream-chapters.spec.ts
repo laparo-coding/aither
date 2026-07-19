@@ -142,6 +142,21 @@ describe("GET /api/recording/stream/[id] — chaptered asset (T030)", () => {
 		const body = await res.json();
 		expect(body.error.code).toBe("INTERNAL_ERROR");
 	});
+
+	it("rejects HLS playback URLs (.m3u8) in favor of MP4", async () => {
+		mockGetChapteredAssetMapping.mockResolvedValue({
+			assetId: VALID_ASSET_ID,
+			muxAssetId: "mux_test",
+			muxPlaybackUrl: "https://stream.mux.com/playback-xyz.m3u8",
+			chapterCount: 5,
+			generatedAt: "2026-07-19T10:00:00.000Z",
+		});
+		const req = makeStreamRequest(VALID_ASSET_ID);
+		const res = await GET(req, { params: Promise.resolve({ id: VALID_ASSET_ID }) });
+		expect(res.status).toBe(500);
+		const body = await res.json();
+		expect(body.error.code).toBe("INTERNAL_ERROR");
+	});
 });
 
 describe("GET /api/recording/stream/[id] — raw fallback (T032)", () => {
