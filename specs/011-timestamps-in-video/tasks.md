@@ -45,7 +45,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Extend `src/app/recording/player/[id]/page.tsx`: add `chapters`, `chaptersLoaded`, `chaptersNotGenerated`, `hasPlayedOnce` state; fetch `GET /api/recording/chapters/[id]` on mount (parallel to video source load, NFR-002); on first `play` SSE command, if `chapters.length > 0` seek `video.currentTime = chapters[0].start` before `video.play()`; set `hasPlayedOnce = true` to prevent re-seek on subsequent play commands (depends on T010, T011)
+- [ ] T012 [US1] Extend `src/app/recording/player/[id]/page.tsx`: add `chapters`, `chaptersLoaded`, `chaptersNotGenerated`, `hasPlayedOnce` state; fetch `GET /api/recording/chapters/[id]` on mount (parallel to video source load, NFR-002); on first `play` SSE command, if `chapters.length > 0` seek `video.currentTime = chapters[0].start` before `video.play()`; set `hasPlayedOnce = true` to prevent re-seek on subsequent play commands. The initial seek is exclusively client-side — do NOT call `POST /api/recording/playback/play` additionally and do NOT send `startAtFirst` (depends on T010, T011)
 
 **Checkpoint**: User Story 1 fully functional — web player starts at first timestamp.
 

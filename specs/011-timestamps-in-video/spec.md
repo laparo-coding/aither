@@ -16,7 +16,8 @@
 - Q: Was passiert, wenn die Kapitel noch nicht generiert wurden (`404 CHAPTERS_NOT_GENERATED`)? → A: **Button deaktivieren + Hinweis.** Der Button bleibt deaktiviert und die UI zeigt einen Hinweis, dass die Kapitel zuerst regeneriert werden müssen. Entspricht Gaia FR-004a.
 - Q: Soll der Aither-Player beim Erreichen eines Kapitelendes pausieren (wie in Spec 010 implementiert) oder weiterlaufen? → A: **Bestehendes Verhalten beibehalten.** Spec 010 (FR-015) definiert, dass der Player am Kapitelende pausiert und ein `chapter-boundary` SSE-Event auslöst. Dieses Verhalten bleibt unverändert. Der neue „Nächster Timestamp"-Button ergänzt lediglich die manuelle Steuerung und zwingt den Nutzer nicht, bis zum Kapitelende zu warten.
 - Q: Soll die initiale Position (Start bei erstem Timestamp) serverseitig im `POST /api/recording/playback/play`-Endpoint erzwungen werden, oder nur clientseitig im Web-Player? → A: **Beide.** Serverseitig wird der `POST /api/recording/playback/play`-Endpoint so erweitert, dass bei fehlendem `chapterId` automatisch auf Kapitel 0 gesprungen wird (falls Kapitel verfügbar). Clientseitig ergänzt der Web-Player die gleiche Logik beim ersten `play`-Kommando. So ist das Verhalten konsistent, unabhängig davon, welcher Client (Gaia, Web-Player, Dashboard) die Wiedergabe startet.
-- Q: Soll der serverseitige Initial-Seek bei jedem `POST /play` ohne `chapterId` erfolgen, oder nur auf expliziten Wunsch des Clients? → A: **Expliziter Parameter `startAtFirst: true`.** Ein neuer optionaler Parameter `startAtFirst` (boolean, default `false`) steuert den serverseitigen Initial-Seek. Nur wenn `startAtFirst: true` gesendet wird UND Kapitel existieren, sucht der Server auf `chapters[0].start` vor dem Play. Ohne den Parameter bleibt das bestehende Spec-004-Verhalten (Play ab aktueller Position) vollständig erhalten — Resume nach Pause funktioniert weiterhin. Der Web-Player sendet `startAtFirst: true` nur beim ersten Play-Kommando. Begründung: Stateless (Constitution VII — kein In-Memory-First-Play-Tracking nötig), vollständig rückwärtskompatibel, explizite Intent-Kommunikation.
+- Q: Soll der serverseitige Initial-Seek bei jedem `POST /play` ohne `chapterId` erfolgen, oder nur auf expliziten Wunsch des Clients? → A: **Expliziter Parameter `startAtFirst: true`.** Ein neuer optionaler Parameter `startAtFirst` (boolean, default `false`) steuert den serverseitigen Initial-Seek. Nur wenn `startAtFirst: true` gesendet wird UND Kapitel existieren, sucht der Server auf `chapters[0].start` vor dem Play. Ohne den Parameter bleibt das bestehende Spec-004-Verhalten (Play ab aktueller Position) vollständig erhalten — Resume nach Pause funktioniert weiterhin. Begründung: Stateless (Constitution VII — kein In-Memory-First-Play-Tracking nötig), vollständig rückwärtskompatibel, explizite Intent-Kommunikation.
+- Q: Wie soll der Web-Player den Initial-Seek kommunizieren — eigener HTTP-Aufruf mit `startAtFirst: true`, SSE-Kommando-Erweiterung, oder rein clientseitig? → A: **Rein clientseitig (Option B).** Der Web-Player führt den Initial-Seek auf `chapters[0].start` ausschließlich clientseitig durch (FR-002), da er die Kapitel-Liste lokal hält. Der Web-Player ruft `POST /api/recording/playback/play` **nicht** zusätzlich auf und sendet `startAtFirst` **nicht**. Der `startAtFirst`-Parameter bleibt für andere Clients (Dashboard, programmatische Aufrufe) reserviert, die keine eigene Seek-Logik haben. Begründung: Kein doppelter Play-Dispatch (vermeidet Race-Conditions), keine SSE-Protokolländerung, saubere Trennung der Verantwortlichkeiten (Web-Player hat lokale Kapitel-Liste → clientseitiger Seek; Server-Parameter für Clients ohne lokale Seek-Logik).
 
 ## Overview
 
@@ -59,7 +60,7 @@ GET /api/recording/chapters/[id] ─→ ChapterListResponse (chapters[] in secon
 ```
 
 1. **Load chapters** — On mount, the web player fetches `GET /api/recording/chapters/[id]` and stores the chapter list in local state. If the request fails with `404 CHAPTERS_NOT_GENERATED`, the player falls back to the existing headless behavior (no timestamp navigation).
-2. **Initial play** — When the first `play` SSE command arrives (or the user presses play), the player seeks to `chapters[0].start` before calling `video.play()`, if chapters are available. This matches Gaia's behavior of starting playback at the first timestamp.
+2. **Initial play** — When the first `play` SSE command arrives (or the user presses play), the player seeks to `chapters[0].start` before calling `video.play()`, if chapters are available. This matches Gaia's behavior of starting playback at the first timestamp. The seek is performed **exclusively client-side** on the `<video>` element; the web player does NOT call `POST /api/recording/playback/play` additionally and does NOT use the server-side `startAtFirst` parameter (reserved for other clients).
 3. **Next Timestamp button** — A new UI control in the player seeks the `<video>` element directly to the start of the next chapter (first chapter with `start > currentTime`). No Aither round-trip is required; the seek is performed client-side using the already-loaded chapter list.
 4. **Button state** — The button is enabled only when a next chapter exists (position is before the last chapter) and chapters are loaded. It is disabled when in/past the last chapter or when chapters are not generated.
 5. **Chapter boundary** — The existing `chapter-boundary` SSE event (Spec 010, FR-015) remains unchanged. When the player reaches a chapter's `end`, it pauses and emits the event. The "Next Timestamp" button provides manual navigation independent of the boundary pause.
@@ -114,9 +115,9 @@ As a seminar operator viewing a recording in the Aither web player, I want a "Ne
 
 ### User Story 3 — Server-Side Initial Seek Consistency (Priority: P2)
 
-As a platform consumer (Gaia, dashboard, or other client) calling `POST /api/recording/playback/play` without a `chapterId`, I want the playback to start at the first timestamp automatically, so that the initial-seek behavior is consistent regardless of which client initiates playback.
+As a platform consumer (Gaia, dashboard, or other client without local seek logic) calling `POST /api/recording/playback/play` with `startAtFirst: true`, I want the playback to start at the first timestamp automatically, so that the initial-seek behavior is consistent regardless of which client initiates playback.
 
-**Why this priority**: Ensures the behavior is not dependent on client-side logic alone; the server enforces the initial seek for all clients.
+**Why this priority**: Ensures the behavior is available for clients that do not implement their own client-side seek logic (e.g., dashboard triggers, programmatic callers). The web player handles its initial seek client-side (FR-002) and does not use this parameter.
 
 **Independent Test**: Can be fully tested by calling `POST /api/recording/playback/play` without `chapterId` for a chaptered recording and verifying that a `seek` command to `chapters[0].start` is dispatched before the `play` command.
 
@@ -141,7 +142,7 @@ As a platform consumer (Gaia, dashboard, or other client) calling `POST /api/rec
 ### Functional Requirements
 
 - **FR-001**: The Aither web player (`/recording/player/[id]`) MUST fetch the chapter list via `GET /api/recording/chapters/[id]` on mount and hold it in local state.
-- **FR-002**: When the web player receives the first `play` command AND chapters are available, the player MUST seek to `chapters[0].start` before calling `video.play()`. Subsequent `play` commands (after pause/resume) MUST NOT re-seek. The web player MUST send `startAtFirst: true` in the `POST /api/recording/playback/play` request body only on the first play command; subsequent play commands MUST omit `startAtFirst` (or set it to `false`) to preserve resume behavior.
+- **FR-002**: When the web player receives the first `play` command AND chapters are available, the player MUST seek to `chapters[0].start` before calling `video.play()`. Subsequent `play` commands (after pause/resume) MUST NOT re-seek. The initial seek is performed **exclusively client-side** on the `<video>` element; the web player MUST NOT call `POST /api/recording/playback/play` additionally and MUST NOT send `startAtFirst` (the server-side parameter is reserved for other clients without local seek logic).
 - **FR-003**: The web player MUST expose a **"Next Timestamp" button**. Pressing the button MUST seek the `<video>` element to the start of the next chapter — the first chapter whose `start` is greater than the current playback position. The seek MUST be performed client-side using the already-loaded chapter list; no Aither round-trip is required.
 - **FR-004**: The "Next Timestamp" button MUST be disabled when no next chapter exists (position is within or past the last chapter) or when chapters are not available.
 - **FR-004a**: When chapters are not generated (`404 CHAPTERS_NOT_GENERATED`), the "Next Timestamp" button MUST be disabled and the UI MUST show a hint prompting the operator to regenerate chapters first.
@@ -208,10 +209,10 @@ interface TimestampPlayerState {
   chapters: ChapterSummary[];      // from GET /api/recording/chapters/[id]
   chaptersLoaded: boolean;          // true after successful fetch
   chaptersNotGenerated: boolean;    // true if 404 CHAPTERS_NOT_GENERATED
-  hasPlayedOnce: boolean;           // tracks initial-seek-on-first-play (client-side)
+  hasPlayedOnce: boolean;           // tracks initial-seek-on-first-play (client-side only)
 }
 
-### Extended Request Schema (Server-Side)
+### Extended Request Schema (Server-Side — for non-web-player clients)
 
 ```typescript
 interface ChapterPlaybackRequest {
@@ -220,6 +221,8 @@ interface ChapterPlaybackRequest {
   startAtFirst?: boolean;  // NEW: when true + no chapterId + chapters exist → seek to chapters[0].start
 }
 ```
+
+**Note**: The web player does NOT use `startAtFirst` — it performs its initial seek client-side (FR-002). The `startAtFirst` parameter is reserved for clients without local seek logic (e.g., dashboard triggers, programmatic callers).
 ```
 
 ### Next Timestamp Logic (Client-Side)
