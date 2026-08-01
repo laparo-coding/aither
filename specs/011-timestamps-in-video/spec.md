@@ -16,6 +16,7 @@
 - Q: Was passiert, wenn die Kapitel noch nicht generiert wurden (`404 CHAPTERS_NOT_GENERATED`)? → A: **Button deaktivieren + Hinweis.** Der Button bleibt deaktiviert und die UI zeigt einen Hinweis, dass die Kapitel zuerst regeneriert werden müssen. Entspricht Gaia FR-004a.
 - Q: Soll der Aither-Player beim Erreichen eines Kapitelendes pausieren (wie in Spec 010 implementiert) oder weiterlaufen? → A: **Bestehendes Verhalten beibehalten.** Spec 010 (FR-015) definiert, dass der Player am Kapitelende pausiert und ein `chapter-boundary` SSE-Event auslöst. Dieses Verhalten bleibt unverändert. Der neue „Nächster Timestamp"-Button ergänzt lediglich die manuelle Steuerung und zwingt den Nutzer nicht, bis zum Kapitelende zu warten.
 - Q: Soll die initiale Position (Start bei erstem Timestamp) serverseitig im `POST /api/recording/playback/play`-Endpoint erzwungen werden, oder nur clientseitig im Web-Player? → A: **Beide.** Serverseitig wird der `POST /api/recording/playback/play`-Endpoint so erweitert, dass bei fehlendem `chapterId` automatisch auf Kapitel 0 gesprungen wird (falls Kapitel verfügbar). Clientseitig ergänzt der Web-Player die gleiche Logik beim ersten `play`-Kommando. So ist das Verhalten konsistent, unabhängig davon, welcher Client (Gaia, Web-Player, Dashboard) die Wiedergabe startet.
+- Q: Soll der serverseitige Initial-Seek bei jedem `POST /play` ohne `chapterId` erfolgen, oder nur auf expliziten Wunsch des Clients? → A: **Expliziter Parameter `startAtFirst: true`.** Ein neuer optionaler Parameter `startAtFirst` (boolean, default `false`) steuert den serverseitigen Initial-Seek. Nur wenn `startAtFirst: true` gesendet wird UND Kapitel existieren, sucht der Server auf `chapters[0].start` vor dem Play. Ohne den Parameter bleibt das bestehende Spec-004-Verhalten (Play ab aktueller Position) vollständig erhalten — Resume nach Pause funktioniert weiterhin. Der Web-Player sendet `startAtFirst: true` nur beim ersten Play-Kommando. Begründung: Stateless (Constitution VII — kein In-Memory-First-Play-Tracking nötig), vollständig rückwärtskompatibel, explizite Intent-Kommunikation.
 
 ## Overview
 
@@ -66,14 +67,19 @@ GET /api/recording/chapters/[id] ─→ ChapterListResponse (chapters[] in secon
 ### Server-Side Initial Seek (Consistency Guarantee)
 
 ```
-POST /api/recording/playback/play (no chapterId)
+POST /api/recording/playback/play { startAtFirst: true } (no chapterId)
                                      │
                                      ▼
    if chapters available → dispatch seek to chapters[0].start, then play
    if no chapters        → dispatch play only (backward compatible, Spec 004)
+
+POST /api/recording/playback/play (no startAtFirst, no chapterId)
+                                     │
+                                     ▼
+   dispatch play only (Spec 004 behavior — resume from current position)
 ```
 
-The `POST /api/recording/playback/play` endpoint is extended so that when no `chapterId` is provided AND a chaptered asset exists for the recording, the endpoint automatically seeks to `chapters[0].start` before dispatching `play`. This ensures the initial-seek-to-first-timestamp behavior is consistent across all clients (Gaia, web player, dashboard triggers), not just the web player.
+The `POST /api/recording/playback/play` endpoint accepts an optional `startAtFirst` boolean parameter (default `false`). When `startAtFirst: true` is provided AND a chaptered asset exists for the recording, the endpoint seeks to `chapters[0].start` before dispatching `play`. When `startAtFirst` is omitted or `false`, the endpoint preserves the existing Spec 004 behavior (play from current position). This ensures the initial-seek-to-first-timestamp behavior is opt-in and consistent across all clients (Gaia, web player, dashboard triggers) without breaking resume.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -116,9 +122,10 @@ As a platform consumer (Gaia, dashboard, or other client) calling `POST /api/rec
 
 **Acceptance Scenarios**:
 
-1. **Given** a chaptered recording exists, **When** `POST /api/recording/playback/play` is called without `chapterId`, **Then** the endpoint dispatches a `seek` to `chapters[0].start` followed by `play`, and returns `200` with `{ accepted: true, chapterId: 0, start, end }`.
-2. **Given** a recording without chapters (`404 CHAPTERS_NOT_GENERATED`), **When** `POST /api/recording/playback/play` is called without `chapterId`, **Then** the endpoint dispatches `play` only (existing behavior, backward compatible) and returns `200` with `{ accepted: true }`.
-3. **Given** a chaptered recording exists, **When** `POST /api/recording/playback/play` is called with an explicit `chapterId`, **Then** the existing behavior (Spec 010, T027) is preserved — seek to that chapter's start, then play.
+1. **Given** a chaptered recording exists, **When** `POST /api/recording/playback/play` is called with `{ startAtFirst: true }` and no `chapterId`, **Then** the endpoint dispatches a `seek` to `chapters[0].start` followed by `play`, and returns `200` with `{ accepted: true, chapterId: 0, start, end }`.
+2. **Given** a recording without chapters (`404 CHAPTERS_NOT_GENERATED`), **When** `POST /api/recording/playback/play` is called with `{ startAtFirst: true }` and no `chapterId`, **Then** the endpoint dispatches `play` only (existing behavior, backward compatible) and returns `200` with `{ accepted: true }`.
+3. **Given** a chaptered recording exists, **When** `POST /api/recording/playback/play` is called without `startAtFirst` (or `startAtFirst: false`) and no `chapterId`, **Then** the endpoint dispatches `play` only (Spec 004 resume behavior) and returns `200` with `{ accepted: true }`.
+4. **Given** a chaptered recording exists, **When** `POST /api/recording/playback/play` is called with an explicit `chapterId`, **Then** the existing behavior (Spec 010, T027) is preserved — seek to that chapter's start, then play.
 
 ### Edge Cases
 
@@ -134,12 +141,12 @@ As a platform consumer (Gaia, dashboard, or other client) calling `POST /api/rec
 ### Functional Requirements
 
 - **FR-001**: The Aither web player (`/recording/player/[id]`) MUST fetch the chapter list via `GET /api/recording/chapters/[id]` on mount and hold it in local state.
-- **FR-002**: When the web player receives the first `play` command AND chapters are available, the player MUST seek to `chapters[0].start` before calling `video.play()`. Subsequent `play` commands (after pause/resume) MUST NOT re-seek.
+- **FR-002**: When the web player receives the first `play` command AND chapters are available, the player MUST seek to `chapters[0].start` before calling `video.play()`. Subsequent `play` commands (after pause/resume) MUST NOT re-seek. The web player MUST send `startAtFirst: true` in the `POST /api/recording/playback/play` request body only on the first play command; subsequent play commands MUST omit `startAtFirst` (or set it to `false`) to preserve resume behavior.
 - **FR-003**: The web player MUST expose a **"Next Timestamp" button**. Pressing the button MUST seek the `<video>` element to the start of the next chapter — the first chapter whose `start` is greater than the current playback position. The seek MUST be performed client-side using the already-loaded chapter list; no Aither round-trip is required.
 - **FR-004**: The "Next Timestamp" button MUST be disabled when no next chapter exists (position is within or past the last chapter) or when chapters are not available.
 - **FR-004a**: When chapters are not generated (`404 CHAPTERS_NOT_GENERATED`), the "Next Timestamp" button MUST be disabled and the UI MUST show a hint prompting the operator to regenerate chapters first.
-- **FR-005**: The `POST /api/recording/playback/play` endpoint MUST, when no `chapterId` is provided AND a chaptered asset exists, dispatch a `seek` to `chapters[0].start` followed by `play`, and return `200` with `{ accepted: true, chapterId: 0, start, end }`.
-- **FR-006**: The `POST /api/recording/playback/play` endpoint MUST preserve backward compatibility: when no chaptered asset exists and no `chapterId` is provided, it dispatches `play` only and returns `200` with `{ accepted: true }` (Spec 004 behavior).
+- **FR-005**: The `POST /api/recording/playback/play` endpoint MUST accept an optional `startAtFirst` boolean parameter (default `false`). When `startAtFirst: true` is provided AND no `chapterId` is provided AND a chaptered asset exists, the endpoint MUST dispatch a `seek` to `chapters[0].start` followed by `play`, and return `200` with `{ accepted: true, chapterId: 0, start, end }`.
+- **FR-006**: The `POST /api/recording/playback/play` endpoint MUST preserve backward compatibility: when `startAtFirst` is omitted (or `false`) and no `chapterId` is provided, it dispatches `play` only and returns `200` with `{ accepted: true }` (Spec 004 behavior — resume from current position). This applies regardless of whether a chaptered asset exists.
 - **FR-007**: The existing `chapterId`-based playback (Spec 010, T027) MUST remain unchanged — an explicit `chapterId` seeks to that chapter's start and plays.
 - **FR-008**: The existing `chapter-boundary` SSE event (Spec 010, FR-015) MUST remain unchanged — the player still pauses at chapter end and emits the boundary event.
 - **FR-009**: The "Next Timestamp" button's seek logic MUST be position-relative: the next chapter is the first chapter whose `start` is strictly greater than the current playback position. This MUST work mid-chapter (skip ahead) and when paused at a chapter boundary.
@@ -155,18 +162,19 @@ As a platform consumer (Gaia, dashboard, or other client) calling `POST /api/rec
 
 ### Extended: `POST /api/recording/playback/play`
 
-**Behavior change**: When `chapterId` is omitted and a chaptered asset exists, the endpoint now seeks to `chapters[0].start` before playing.
+**Behavior change**: A new optional `startAtFirst` boolean parameter (default `false`) controls the initial seek. When `startAtFirst: true` is provided and a chaptered asset exists, the endpoint seeks to `chapters[0].start` before playing. When omitted, the existing Spec 004 behavior (play from current position) is preserved.
 
-**Request** (unchanged schema):
+**Request** (extended schema):
 ```json
 {
   "recordingId": "rec_2026-07-13T10-30-00Z",
-  "chapterId": 0
+  "chapterId": 0,
+  "startAtFirst": true
 }
 ```
-`chapterId` remains optional. When omitted, the endpoint now defaults to chapter 0 (if chapters exist).
+`chapterId` remains optional. `startAtFirst` is optional (default `false`). When `startAtFirst: true` and no `chapterId` is provided, the endpoint seeks to `chapters[0].start` (if chapters exist).
 
-**Response 200** (when chapters exist, `chapterId` omitted or provided):
+**Response 200** (when `startAtFirst: true`, chapters exist, no `chapterId`):
 ```json
 {
   "accepted": true,
@@ -176,7 +184,7 @@ As a platform consumer (Gaia, dashboard, or other client) calling `POST /api/rec
 }
 ```
 
-**Response 200** (when no chapters exist, `chapterId` omitted — backward compatible):
+**Response 200** (when `startAtFirst` omitted/false, or no chapters exist — backward compatible):
 ```json
 {
   "accepted": true
@@ -200,8 +208,18 @@ interface TimestampPlayerState {
   chapters: ChapterSummary[];      // from GET /api/recording/chapters/[id]
   chaptersLoaded: boolean;          // true after successful fetch
   chaptersNotGenerated: boolean;    // true if 404 CHAPTERS_NOT_GENERATED
-  hasPlayedOnce: boolean;           // tracks initial-seek-on-first-play
+  hasPlayedOnce: boolean;           // tracks initial-seek-on-first-play (client-side)
 }
+
+### Extended Request Schema (Server-Side)
+
+```typescript
+interface ChapterPlaybackRequest {
+  recordingId: string;
+  chapterId?: number;      // existing (Spec 010)
+  startAtFirst?: boolean;  // NEW: when true + no chapterId + chapters exist → seek to chapters[0].start
+}
+```
 ```
 
 ### Next Timestamp Logic (Client-Side)

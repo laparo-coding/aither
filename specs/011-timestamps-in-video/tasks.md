@@ -79,13 +79,14 @@
 
 ### Tests for User Story 3 (write first, must fail)
 
-- [ ] T030 [P] [US3] Contract test in `tests/contract/recording/playback-play-initial-seek.spec.ts`: `POST /api/recording/playback/play` without `chapterId` for chaptered recording returns 200 with `{ accepted: true, chapterId: 0, start, end }` and dispatches seek to `chapters[0].start` before play
-- [ ] T031 [P] [US3] Contract test in `tests/contract/recording/playback-play-initial-seek.spec.ts`: `POST /api/recording/playback/play` without `chapterId` for non-chaptered recording returns 200 with `{ accepted: true }` (backward compatible, Spec 004 behavior)
-- [ ] T032 [P] [US3] Contract test in `tests/contract/recording/playback-play-initial-seek.spec.ts`: `POST /api/recording/playback/play` with explicit `chapterId` preserves existing Spec 010 behavior (seek to that chapter, play, return start/end)
+- [ ] T030 [P] [US3] Contract test in `tests/contract/recording/playback-play-initial-seek.spec.ts`: `POST /api/recording/playback/play` with `{ startAtFirst: true }` and no `chapterId` for chaptered recording returns 200 with `{ accepted: true, chapterId: 0, start, end }` and dispatches seek to `chapters[0].start` before play
+- [ ] T031 [P] [US3] Contract test in `tests/contract/recording/playback-play-initial-seek.spec.ts`: `POST /api/recording/playback/play` with `{ startAtFirst: true }` and no `chapterId` for non-chaptered recording returns 200 with `{ accepted: true }` (backward compatible, Spec 004 behavior)
+- [ ] T032 [P] [US3] Contract test in `tests/contract/recording/playback-play-initial-seek.spec.ts`: `POST /api/recording/playback/play` without `startAtFirst` (or `false`) and no `chapterId` returns 200 with `{ accepted: true }` (Spec 004 resume behavior preserved, even if chapters exist)
+- [ ] T032a [P] [US3] Contract test in `tests/contract/recording/playback-play-initial-seek.spec.ts`: `POST /api/recording/playback/play` with explicit `chapterId` preserves existing Spec 010 behavior (seek to that chapter, play, return start/end)
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] Extend `src/app/api/recording/playback/play/route.ts`: in the `chapterId === undefined` branch, attempt `getChapteredAssetMapping(recordingId)`; if mapping exists, call `extractChapters`, dispatch `seek` to `chapters[0].start` then `play`, return 200 with `{ accepted: true, chapterId: 0, start: chapters[0].start, end: chapters[0].end }`; if mapping is null or `extractChapters` fails, fall back to existing behavior (dispatch `play` only, return `{ accepted: true }`). Wrap mapping/extraction errors in try/catch to ensure backward compatibility (depends on T030, T031, T032)
+- [ ] T033 [US3] Extend `src/app/api/recording/playback/play/route.ts`: add optional `startAtFirst` boolean to `ChapterPlaybackRequestSchema` (default `false`); in the `chapterId === undefined && startAtFirst === true` branch, attempt `getChapteredAssetMapping(recordingId)`; if mapping exists, call `extractChapters`, dispatch `seek` to `chapters[0].start` then `play`, return 200 with `{ accepted: true, chapterId: 0, start: chapters[0].start, end: chapters[0].end }`; if mapping is null or `extractChapters` fails, fall back to existing behavior (dispatch `play` only, return `{ accepted: true }`). When `startAtFirst` is omitted/false, preserve Spec 004 behavior (dispatch `play` only). Wrap mapping/extraction errors in try/catch to ensure backward compatibility (depends on T030, T031, T032, T032a)
 
 **Checkpoint**: User Story 3 fully functional — server-side initial seek consistent across all clients.
 

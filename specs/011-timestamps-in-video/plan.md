@@ -5,7 +5,7 @@
 
 ## Summary
 
-Bring the Aither web player (`/recording/player/[id]`) to behavioral parity with the Gaia controller's timestamp playback (Gaia Spec 010). The web player fetches the chapter list via the existing `GET /api/recording/chapters/[id]` endpoint (Spec 010) on mount, seeks to `chapters[0].start` on the first `play` command, and exposes a **"Next Timestamp" button** that performs a client-side seek to the next chapter (first chapter with `start > currentPosition`). The `POST /api/recording/playback/play` endpoint is extended so that when no `chapterId` is provided and a chaptered asset exists, it auto-seeks to `chapters[0].start` before playing — ensuring consistency across all clients (Gaia, web player, dashboard). No new data models, no new endpoints; reuses Spec 010's chapter infrastructure.
+Bring the Aither web player (`/recording/player/[id]`) to behavioral parity with the Gaia controller's timestamp playback (Gaia Spec 010). The web player fetches the chapter list via the existing `GET /api/recording/chapters/[id]` endpoint (Spec 010) on mount, seeks to `chapters[0].start` on the first `play` command, and exposes a **"Next Timestamp" button** that performs a client-side seek to the next chapter (first chapter with `start > currentPosition`). The `POST /api/recording/playback/play` endpoint is extended with a new optional `startAtFirst` boolean parameter (default `false`): when `startAtFirst: true` is provided and a chaptered asset exists, the endpoint seeks to `chapters[0].start` before playing. Without `startAtFirst`, the existing Spec 004 behavior (play from current position / resume) is fully preserved. The web player sends `startAtFirst: true` only on the first play command. No new data models, no new endpoints; reuses Spec 010's chapter infrastructure.
 
 ## Technical Context
 
@@ -93,7 +93,7 @@ tests/
 **Deliverables**: `tasks.md` (this feature is small enough that data-model.md and contracts/ are not needed — no new data models, no new endpoints).
 
 1. **Pure function** `nextTimestamp(chapters, currentPosition)` — direct port of Gaia's `ChapterSeekLogic.nextChapter`.
-2. **Route extension** — `POST /api/recording/playback/play` without `chapterId` auto-seeks to `chapters[0].start` when chapters exist.
+2. **Route extension** — `POST /api/recording/playback/play` with `startAtFirst: true` (no `chapterId`) seeks to `chapters[0].start` when chapters exist; without `startAtFirst` preserves Spec 004 resume behavior.
 3. **Client component extension** — fetch chapters on mount, initial-seek-on-first-play, Next Timestamp button overlay.
 
 ### Phase 2: Implementation
