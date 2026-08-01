@@ -65,7 +65,7 @@
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Extend `src/app/recording/player/[id]/page.tsx`: add "Next Timestamp" button overlay; on click, call `nextTimestamp(chapters, video.currentTime)` and set `video.currentTime = next.start` if non-null; button enabled only when `chaptersLoaded && nextTimestamp(...) !== null`; when `chaptersNotGenerated`, show hint text "Kapitel noch nicht generiert. Bitte zuerst regenerieren." (depends on T002, T020, T021, T022)
+- [ ] T023 [US2] Extend `src/app/recording/player/[id]/page.tsx`: add "Next Timestamp" button as a minimal overlay icon (bottom-right, visible on hover/mouse movement or key press, hidden after ~3s inactivity); add keyboard shortcut listener for key "N" (works regardless of overlay visibility); on click or "N" key, call `nextTimestamp(chapters, video.currentTime)` and set `video.currentTime = next.start` if non-null; button enabled only when `chaptersLoaded && nextTimestamp(...) !== null`; when `chaptersNotGenerated`, show hint text "Kapitel noch nicht generiert. Bitte zuerst regenerieren." (depends on T002, T020, T021, T022)
 
 **Checkpoint**: User Story 2 fully functional — web player has working Next Timestamp button.
 
