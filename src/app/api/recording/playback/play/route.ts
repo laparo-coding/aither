@@ -38,10 +38,65 @@ export async function POST(req: NextRequest) {
 			);
 		}
 
-		const { recordingId, chapterId } = parsed.data;
+		const { recordingId, chapterId, startAtFirst } = parsed.data;
 
-		// If no chapterId, dispatch plain play (backward compatible with Spec 004)
+		// If no chapterId, check startAtFirst for server-side initial seek (Spec 011, FR-005).
+		// When startAtFirst is omitted/false, dispatch plain play (Spec 004 backward compatible).
 		if (chapterId === undefined) {
+			if (startAtFirst === true) {
+				// Attempt to seek to chapters[0].start before playing (FR-005).
+				// Falls back to plain play if no chaptered asset exists or extraction fails.
+				try {
+					const mapping = await getChapteredAssetMapping(recordingId);
+					if (mapping) {
+						const chapterList = await extractChapters(recordingId, mapping.muxPlaybackUrl);
+						if (chapterList.chapters.length > 0) {
+							const firstChapter = chapterList.chapters[0];
+							const seekResult = dispatchCommand(recordingId, {
+								action: "seek",
+								position: firstChapter.start,
+							});
+							if (!seekResult) {
+								return createErrorResponse(
+									"No player connected for this recording",
+									ErrorCodes.NOT_FOUND,
+									undefined,
+									404,
+								);
+							}
+							const playResult = dispatchCommand(recordingId, { action: "play" });
+							if (!playResult) {
+								return createErrorResponse(
+									"No player connected for this recording",
+									ErrorCodes.NOT_FOUND,
+									undefined,
+									404,
+								);
+							}
+							return createSuccessResponse({
+								accepted: true,
+								chapterId: 0,
+								start: firstChapter.start,
+								end: firstChapter.end,
+							});
+						}
+					}
+					// No mapping or no chapters — fall through to plain play.
+				} catch (err) {
+					// Log but don't fail — fall through to plain play (backward compatible).
+					reportError(
+						err instanceof Error ? err : new Error(String(err)),
+						{
+							route: "/api/recording/playback/play",
+							method: "POST",
+							additionalData: { recordingId, startAtFirst: true },
+						},
+						"warning",
+					);
+				}
+			}
+
+			// Plain play (Spec 004 backward compatible — resume from current position)
 			const result = dispatchCommand(recordingId, { action: "play" });
 			if (!result) {
 				return createErrorResponse(
