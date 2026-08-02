@@ -15,7 +15,7 @@
 - Q: Was passiert, wenn der Player im oder nach dem letzten Kapitel ist (kein nächstes Kapitel mehr)? → A: **Button deaktivieren.** Wenn kein Kapitel mit `start > currentPosition` existiert, ist der Button deaktiviert (graue Darstellung, nicht klickbar). Entspricht Gaia FR-004.
 - Q: Was passiert, wenn die Kapitel noch nicht generiert wurden (`404 CHAPTERS_NOT_GENERATED`)? → A: **Button deaktivieren + Hinweis.** Der Button bleibt deaktiviert und die UI zeigt einen Hinweis, dass die Kapitel zuerst regeneriert werden müssen. Entspricht Gaia FR-004a.
 - Q: Soll der Aither-Player beim Erreichen eines Kapitelendes pausieren (wie in Spec 010 implementiert) oder weiterlaufen? → A: **Bestehendes Verhalten beibehalten.** Spec 010 (FR-015) definiert, dass der Player am Kapitelende pausiert und ein `chapter-boundary` SSE-Event auslöst. Dieses Verhalten bleibt unverändert. Der neue „Nächster Timestamp"-Button ergänzt lediglich die manuelle Steuerung und zwingt den Nutzer nicht, bis zum Kapitelende zu warten.
-- Q: Soll die initiale Position (Start bei erstem Timestamp) serverseitig im `POST /api/recording/playback/play`-Endpoint erzwungen werden, oder nur clientseitig im Web-Player? → A: **Beide.** Serverseitig wird der `POST /api/recording/playback/play`-Endpoint so erweitert, dass bei fehlendem `chapterId` automatisch auf Kapitel 0 gesprungen wird (falls Kapitel verfügbar). Clientseitig ergänzt der Web-Player die gleiche Logik beim ersten `play`-Kommando. So ist das Verhalten konsistent, unabhängig davon, welcher Client (Gaia, Web-Player, Dashboard) die Wiedergabe startet.
+- Q: Soll die initiale Position (Start bei erstem Timestamp) serverseitig im `POST /api/recording/playback/play`-Endpoint erzwungen werden, oder nur clientseitig im Web-Player? → A: **Beide.** *(Superseded by Q8/Q9 — siehe unten für die finale Ausprägung: serverseitig via `startAtFirst`-Parameter, clientseitig exklusiv im Web-Player ohne `startAtFirst`.)* Ursprüngliche Antwort: Serverseitig wird der `POST /api/recording/playback/play`-Endpoint so erweitert, dass bei fehlendem `chapterId` automatisch auf Kapitel 0 gesprungen wird (falls Kapitel verfügbar). Clientseitig ergänzt der Web-Player die gleiche Logik beim ersten `play`-Kommando. So ist das Verhalten konsistent, unabhängig davon, welcher Client (Gaia, Web-Player, Dashboard) die Wiedergabe startet.
 - Q: Soll der serverseitige Initial-Seek bei jedem `POST /play` ohne `chapterId` erfolgen, oder nur auf expliziten Wunsch des Clients? → A: **Expliziter Parameter `startAtFirst: true`.** Ein neuer optionaler Parameter `startAtFirst` (boolean, default `false`) steuert den serverseitigen Initial-Seek. Nur wenn `startAtFirst: true` gesendet wird UND Kapitel existieren, sucht der Server auf `chapters[0].start` vor dem Play. Ohne den Parameter bleibt das bestehende Spec-004-Verhalten (Play ab aktueller Position) vollständig erhalten — Resume nach Pause funktioniert weiterhin. Begründung: Stateless (Constitution VII — kein In-Memory-First-Play-Tracking nötig), vollständig rückwärtskompatibel, explizite Intent-Kommunikation.
 - Q: Wie soll der „Nächster Timestamp"-Button visuell integriert werden, ohne das headless-Design zu brechen? → A: **Tastatur-Shortcut „N" + minimales Overlay (Option C).** Der Button reagiert auf die Tastatur-Taste „N" (Next) und zusätzlich auf ein kleines Icon unten rechts, das nur bei Hover/Mausbewegung oder Tastendruck sichtbar wird und nach Inaktivität verschwindet. So bleibt der headless-Charakter des Full-Screen-Players erhalten, der Button ist aber sowohl per Tastatur (Seminar-Operator am Kontrollplatz) als auch per Touch/Maus nutzbar. Konsistent mit dem bestehenden minimalen Overlay („Connecting…" Indikator oben rechts).
 - Q: Wie authentifiziert der Web-Player (Client-Komponente) den Kapitel-Fetch gegen `GET /api/recording/chapters/[id]` (requireAdmin)? → A: **Cookie-basiert (Clerk Session, Option A).** Der `fetch("/api/recording/chapters/[id]")` nutzt automatisch die bestehende Clerk-Session-Cookie (Same-Origin). Kein Bearer-Token im Client-Code, keine neue Proxy-Route. Entspricht dem bestehenden Muster: der Web-Player ruft bereits `/api/recording/events` (SSE) und `/api/recording/playback/state` (POST) ohne explizite Authorization-Header auf — die `requireAdmin`-Guard liest die Session aus dem Cookie. Der Kapitel-Fetch verhält sich identisch.
@@ -216,6 +216,7 @@ interface TimestampPlayerState {
   chaptersNotGenerated: boolean;    // true if 404 CHAPTERS_NOT_GENERATED
   hasPlayedOnce: boolean;           // tracks initial-seek-on-first-play (client-side only)
 }
+```
 
 ### Extended Request Schema (Server-Side — for non-web-player clients)
 
@@ -247,12 +248,13 @@ function nextTimestamp(
 
 - **Unit tests** (Vitest):
   - `nextTimestamp` pure function (mirrors Gaia's `ChapterSeekLogicTests`): mid-chapter, at boundary, in last chapter, past last chapter, empty chapters, single chapter, position before first chapter.
-  - `POST /api/recording/playback/play` route: initial-seek-to-chapter-0 when `chapterId` omitted and chapters exist; backward-compatible play when no chapters; explicit `chapterId` unchanged.
+  - `POST /api/recording/playback/play` route: initial-seek-to-chapter-0 when `startAtFirst: true` and no `chapterId` and chapters exist; backward-compatible play when `startAtFirst` omitted/false; explicit `chapterId` unchanged (Spec 010).
 - **Contract tests** (Vitest):
-  - `POST /api/recording/playback/play` without `chapterId` returns `{ accepted, chapterId: 0, start, end }` for chaptered recordings.
-  - `POST /api/recording/playback/play` without `chapterId` returns `{ accepted: true }` for non-chaptered recordings.
+  - `POST /api/recording/playback/play` with `{ startAtFirst: true }` and no `chapterId` returns `{ accepted, chapterId: 0, start, end }` for chaptered recordings.
+  - `POST /api/recording/playback/play` with `{ startAtFirst: true }` and no `chapterId` returns `{ accepted: true }` for non-chaptered recordings (backward compatible).
+  - `POST /api/recording/playback/play` without `startAtFirst` returns `{ accepted: true }` (Spec 004 resume behavior preserved).
 - **E2E tests** (Playwright):
-  - Web player loads chapters on mount, seeks to `chapters[0].start` on first play.
+  - Web player loads chapters on mount, seeks to `chapters[0].start` on first play (client-side, no `startAtFirst`).
   - "Next Timestamp" button seeks to next chapter start; disabled at last chapter.
   - Button disabled with hint when chapters not generated.
 
