@@ -52,10 +52,12 @@ describe("Chapter inferred types (compile-time)", () => {
 	it("ChapterPlaybackRequest allows optional chapterId", () => {
 		const withoutChapter: ChapterPlaybackRequest = {
 			recordingId: "rec_2026-07-13T10-30-00Z",
+			startAtFirst: false,
 		};
 		const withChapter: ChapterPlaybackRequest = {
 			recordingId: "rec_2026-07-13T10-30-00Z",
 			chapterId: 1,
+			startAtFirst: false,
 		};
 		expect(withoutChapter.chapterId).toBeUndefined();
 		expect(withChapter.chapterId).toBe(1);

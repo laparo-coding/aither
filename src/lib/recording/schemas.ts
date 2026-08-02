@@ -210,6 +210,7 @@ export const ChapterRegenerationResultSchema = z.object({
 export const ChapterPlaybackRequestSchema = z.object({
 	recordingId: z.string().min(1),
 	chapterId: z.number().int().min(0).optional(),
+	startAtFirst: z.boolean().optional().default(false),
 });
 
 /** Response body for extended POST /api/recording/playback/play. */
