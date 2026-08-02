@@ -2,7 +2,7 @@
 
 **Feature Branch**: `011-timestamps-in-video`
 **Created**: 2026-08-01
-**Status**: Draft
+**Status**: Implemented
 **Input**: User description: "In Gaia ist eine Player-Erweiterung verfügbar, sodass der Player nun beim Abspielen eines Videos mit dem ersten Timestamp beginnt. Ein Button zum Vorspulen auf den nächsten Timestamp ist ebenfalls verfügbar. Welche Anpassungen sind am Aither-Player erforderlich, damit dieser genauso reagiert."
 
 ## Clarifications
