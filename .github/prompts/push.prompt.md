@@ -1,7 +1,6 @@
 ---
 name: push
 description: Lint, test, commit, push, open PR, resolve reviews, merge to main
-model: Claude Haiku
 ---
 ## Pre-flight
 - Run lint, format check, typecheck, spellcheck, build, and tests; stop on failure.
