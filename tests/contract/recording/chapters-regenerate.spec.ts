@@ -87,6 +87,15 @@ vi.mock("@/lib/recording/mux-uploader", () => ({
 	uploadToMux: (...args: unknown[]) => mockUploadToMux(...args),
 }));
 
+// Chaptered asset mapping mock (Vercel Blob persistence)
+const mockStoreChapteredAssetMapping = vi.fn().mockResolvedValue(undefined);
+const mockGetChapteredAssetMapping = vi.fn().mockResolvedValue(null);
+
+vi.mock("@/lib/recording/chaptered-asset-mapping", () => ({
+	storeChapteredAssetMapping: (...args: unknown[]) => mockStoreChapteredAssetMapping(...args),
+	getChapteredAssetMapping: (...args: unknown[]) => mockGetChapteredAssetMapping(...args),
+}));
+
 // fs/promises unlink mock
 vi.mock("node:fs/promises", () => ({
 	unlink: vi.fn().mockResolvedValue(undefined),
@@ -151,6 +160,8 @@ beforeEach(() => {
 			cb(null, { stdout: JSON.stringify({ chapters: [{}, {}] }) });
 		},
 	);
+	mockStoreChapteredAssetMapping.mockResolvedValue(undefined);
+	mockGetChapteredAssetMapping.mockResolvedValue(null);
 });
 
 describe("POST /api/recording/chapters/[id] — success path (T010)", () => {
