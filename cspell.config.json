@@ -152,7 +152,7 @@
 		"cspell.config.json"
 	],
 	"ignoreRegExpList": ["/\\[äöüßÄÖÜ\\]/", "/[\\p{Script=Cyrillic}]+/u", "/María/", "/O'Brien/"],
-	"import": ["@cspell/dict-de-de/cspell-ext.json"],
+	"import": ["./node_modules/@cspell/dict-de-de/cspell-ext.json"],
 	"dictionaries": ["typescript", "node", "softwareTerms", "en-gb"],
 	"enableFiletypes": [
 		"typescript",

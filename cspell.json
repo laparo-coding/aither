@@ -1,6 +1,6 @@
 {
 	"version": "0.2",
-	"import": ["@cspell/dict-de-de/cspell-ext.json"],
+	"import": ["./node_modules/@cspell/dict-de-de/cspell-ext.json"],
 	"language": "en,de-DE",
 	"dictionaries": ["de-de"],
 	"enableGlobDot": false,
