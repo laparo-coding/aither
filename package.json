@@ -32,13 +32,14 @@
 		"@upstash/redis": "^1.36.2",
 		"@vercel/blob": "^2.6.1",
 		"handlebars": "^4.7.9",
-		"next": "^16.2.6",
+		"next": "^16.2.11",
 		"nodemailer": "^9.0.1",
 		"p-retry": "^6.2.1",
 		"p-throttle": "^6.2.0",
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"rollbar": "^2.26.5",
+		"sharp": "^0.35.0",
 		"uuid": "^11.1.1",
 		"zod": "^3.24.0"
 	},
@@ -65,7 +66,7 @@
 	},
 	"overrides": {
 		"form-data": "^4.0.6",
-		"postcss": "^8.5.10",
+		"postcss": "^8.5.18",
 		"yaml": "^2.8.3"
 	}
 }

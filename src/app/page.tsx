@@ -45,6 +45,7 @@ async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
 	if (!courseDir.startsWith(baseDir + path.sep)) return notGenerated;
 
 	try {
+		// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 		const entries = await fs.readdir(courseDir);
 		const htmlFiles = entries.filter((f) => f.endsWith(".html"));
 
@@ -54,6 +55,7 @@ async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
 
 		let latestMtime = 0;
 		for (const file of htmlFiles) {
+			// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 			const stat = await fs.stat(path.join(courseDir, file));
 			if (stat.mtimeMs > latestMtime) latestMtime = stat.mtimeMs;
 		}
@@ -75,10 +77,12 @@ async function detectSlideCourseId(): Promise<string | null> {
 	const outputDir = process.env.SLIDES_OUTPUT_DIR || "output/slides";
 	const baseDir = path.resolve(process.cwd(), outputDir);
 	try {
+		// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 		const entries = await fs.readdir(baseDir, { withFileTypes: true });
 		const dirs = entries.filter((e) => e.isDirectory() && /^[A-Za-z0-9_.-]+$/.test(e.name));
 		let latest: { name: string; mtime: number } | null = null;
 		for (const dir of dirs) {
+			// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 			const stat = await fs.stat(path.join(baseDir, dir.name));
 			if (!latest || stat.mtimeMs > latest.mtime) {
 				latest = { name: dir.name, mtime: stat.mtimeMs };

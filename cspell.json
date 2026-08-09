@@ -163,6 +163,7 @@
 		"Uranos",
 		"URANOS"
 	],
+	"ignoreRegExpList": ["/nosemgrep[^\n]*/", "/ssrfer/", "/ssrf/", "/safestring/"],
 	"ignorePaths": [
 		"node_modules",
 		".next",

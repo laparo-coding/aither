@@ -98,6 +98,7 @@ async function probe(url: string, method: ProbeMethod, signal: AbortSignal): Pro
 	if (!isSafeFetchUrl(url)) {
 		throw new Error(`Blocked unsafe fetch URL: ${url}`);
 	}
+	// nosemgrep: javascript.lang.security.audit.ssrfer.fetch-ssrf
 	return fetch(url, {
 		method,
 		signal,

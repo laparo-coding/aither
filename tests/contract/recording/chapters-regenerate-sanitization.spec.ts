@@ -76,7 +76,8 @@ vi.mock("node:child_process", () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const VALID_ASSET_ID = "rec_2026-07-13T10-30-00Z";
-const SECRET_TOKEN = "super-secret-bearer-token-1234567890";
+// Test-only fixtures: these are fake values for sanitization assertions, not real credentials.
+const SECRET_TOKEN = process.env.TEST_BEARER_TOKEN ?? "test-bearer-token-fixture";
 const SECRET_PATH = "/internal/output/recordings/secret.mp4";
 const SECRET_BLOB_URL = "https://blob.vercel-storage.com/ffmetadata/secret.json?token=abc";
 

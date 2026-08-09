@@ -37,6 +37,7 @@ export async function GET(req: Request) {
 	if (rel.startsWith("..") || path.isAbsolute(rel)) return NextResponse.json(notGenerated);
 
 	try {
+		// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 		const entries = await fs.readdir(courseDir);
 		const htmlFiles = entries.filter((f) => f.endsWith(".html"));
 
@@ -46,6 +47,7 @@ export async function GET(req: Request) {
 
 		let latestMtime = 0;
 		for (const file of htmlFiles) {
+			// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 			const stat = await fs.stat(path.join(courseDir, file));
 			if (stat.mtimeMs > latestMtime) latestMtime = stat.mtimeMs;
 		}

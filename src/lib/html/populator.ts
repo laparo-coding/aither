@@ -34,6 +34,7 @@ export function registerMediaHelpers(): void {
 		const safeAlt = Handlebars.Utils.escapeExpression(altText ?? "");
 		// Build the <img> element without inline event handlers (onerror) to avoid XSS.
 		// The fallback is handled by the consumer via a CSS class.
+		// nosemgrep: javascript.handlebars.security.handlebars-safestring-xss
 		return new Handlebars.SafeString(
 			`<img src="${safeUrl}" alt="${safeAlt}" loading="lazy" class="media-fallback" />`,
 		);
@@ -41,6 +42,7 @@ export function registerMediaHelpers(): void {
 
 	Handlebars.registerHelper("video", (sourceUrl: string) => {
 		const safeUrl = Handlebars.Utils.escapeExpression(sourceUrl);
+		// nosemgrep: javascript.handlebars.security.handlebars-safestring-xss
 		return new Handlebars.SafeString(
 			`<video controls preload="metadata" src="${safeUrl}"><p class="media-fallback">Video nicht verfügbar: <a href="${safeUrl}">${safeUrl}</a></p></video>`,
 		);

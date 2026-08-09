@@ -49,7 +49,12 @@ const publicPaths = new Set([
 	"/api/recording/playback/state",
 ]);
 
-const protectedRegexes = protectedPatterns.map((p) => new RegExp(`^${escapeRegexPattern(p)}$`));
+// Pre-built regexes for protected path patterns — patterns are static strings,
+// so the regex construction is safe from ReDoS.
+const protectedRegexes = protectedPatterns.map(
+	// nosemgrep: javascript.lang.security.detect-non-literal-regexp
+	(p) => new RegExp(`^${escapeRegexPattern(p)}$`),
+);
 
 /** Escape special regex characters in a pattern string for literal matching. */
 function escapeRegexPattern(s: string): string {

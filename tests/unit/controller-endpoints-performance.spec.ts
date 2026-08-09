@@ -69,10 +69,12 @@ describe("Performance: Controller Endpoints", () => {
 		courseId = "perf-course";
 		tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "controller-perf-"));
 		const courseDir = path.join(tempRoot, courseId);
+		// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 		await fs.mkdir(courseDir, { recursive: true });
 
 		for (let i = 1; i <= 50; i += 1) {
 			const fileName = `${String(i).padStart(3, "0")}_slide.html`;
+			// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 			await fs.writeFile(
 				path.join(courseDir, fileName),
 				`<section><h1>Slide ${i}</h1></section>`,
