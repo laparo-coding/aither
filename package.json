@@ -20,6 +20,9 @@
 		"open:code": "code .",
 		"prepare": "husky install"
 	},
+	"engines": {
+		"node": ">=20.11.0"
+	},
 	"dependencies": {
 		"@clerk/nextjs": "^6.39.3",
 		"@emotion/cache": "^11.14.0",

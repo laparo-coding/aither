@@ -5,6 +5,25 @@
 
 import Handlebars from "handlebars";
 
+function isAllowedMediaUrl(input: string): boolean {
+	const value = input.trim();
+	if (!value) return false;
+	if (value.startsWith("/") || value.startsWith("./") || value.startsWith("../")) {
+		return true;
+	}
+
+	try {
+		const parsed = new URL(value);
+		return parsed.protocol === "http:" || parsed.protocol === "https:";
+	} catch {
+		return false;
+	}
+}
+
+function sanitizeMediaUrl(input: string): string {
+	return isAllowedMediaUrl(input) ? input.trim() : "#";
+}
+
 /**
  * Populates an HTML template with data using Handlebars.
  * - XSS escaping is active by default ({{var}})
@@ -30,7 +49,7 @@ export function populateTemplate(templateHtml: string, data: Record<string, unkn
  */
 export function registerMediaHelpers(): void {
 	Handlebars.registerHelper("image", (sourceUrl: string, altText: string) => {
-		const safeUrl = Handlebars.Utils.escapeExpression(sourceUrl);
+		const safeUrl = Handlebars.Utils.escapeExpression(sanitizeMediaUrl(sourceUrl));
 		const safeAlt = Handlebars.Utils.escapeExpression(altText ?? "");
 		// Build the <img> element without inline event handlers (onerror) to avoid XSS.
 		// The fallback is handled by the consumer via a CSS class.
@@ -41,7 +60,7 @@ export function registerMediaHelpers(): void {
 	});
 
 	Handlebars.registerHelper("video", (sourceUrl: string) => {
-		const safeUrl = Handlebars.Utils.escapeExpression(sourceUrl);
+		const safeUrl = Handlebars.Utils.escapeExpression(sanitizeMediaUrl(sourceUrl));
 		// nosemgrep: javascript.handlebars.security.handlebars-safestring-xss
 		return new Handlebars.SafeString(
 			`<video controls preload="metadata" src="${safeUrl}"><p class="media-fallback">Video nicht verfügbar: <a href="${safeUrl}">${safeUrl}</a></p></video>`,
