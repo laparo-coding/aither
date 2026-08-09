@@ -5,10 +5,17 @@
 // Task: T030 [US4] — Client component, <video> fills viewport at 1920×1080,
 //                    no controls, black background, SSE EventSource, handle
 //                    play/stop/seek commands, POST state reports back
+// Task: T013 [US1] (Spec 011) — Fetch chapters on mount (cookie-based auth),
+//                    seek to chapters[0].start on first play command (client-side)
+// Task: T024 [US2] (Spec 011) — Next Timestamp button + "N" keyboard shortcut,
+//                    minimal overlay icon (bottom-right, hover/key-press visible)
 // ---------------------------------------------------------------------------
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import { nextTimestamp } from "@/lib/recording/chapter-seek-logic";
+import type { ChapterSummary } from "@/lib/recording/types";
 
 type SSECommand = { action: "play" } | { action: "stop" } | { action: "seek"; position: number };
 
@@ -19,6 +26,14 @@ export default function RecordingPlayerPage() {
 	const videoRef = useRef<HTMLVideoElement>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [connected, setConnected] = useState(false);
+
+	// Chapter navigation state (Spec 011)
+	const [chapters, setChapters] = useState<ChapterSummary[]>([]);
+	const [chaptersLoaded, setChaptersLoaded] = useState(false);
+	const [chaptersNotGenerated, setChaptersNotGenerated] = useState(false);
+	const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
+	const [overlayVisible, setOverlayVisible] = useState(false);
+	const [, forceUpdate] = useState(0);
 
 	// Report player state back to the server
 	const reportState = useCallback(
@@ -40,6 +55,69 @@ export default function RecordingPlayerPage() {
 		},
 		[id],
 	);
+
+	// Fetch chapters on mount (Spec 011, FR-001 — cookie-based auth, parallel to video load)
+	useEffect(() => {
+		if (!id) return;
+
+		let cancelled = false;
+		(async () => {
+			try {
+				const res = await fetch(`/api/recording/chapters/${id}`);
+				if (cancelled) return;
+				if (res.status === 200) {
+					const data = await res.json();
+					const chapterList = data.data ?? data;
+					setChapters(chapterList.chapters ?? []);
+					setChaptersLoaded(true);
+				} else if (res.status === 404) {
+					// CHAPTERS_NOT_GENERATED — silent fallback to headless
+					setChaptersNotGenerated(true);
+					setChaptersLoaded(true);
+				} else {
+					// 401 or other — silent fallback to headless (no error UI)
+					setChaptersLoaded(true);
+				}
+			} catch {
+				if (!cancelled) {
+					// Network error — silent fallback to headless
+					setChaptersLoaded(true);
+				}
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [id]);
+
+	// Next Timestamp action (client-side seek, FR-003)
+	const seekToNextTimestamp = useCallback(() => {
+		const video = videoRef.current;
+		if (!video) return;
+		if (!chaptersLoaded || chapters.length === 0) return;
+
+		const next = nextTimestamp(chapters, video.currentTime);
+		if (next) {
+			video.currentTime = next.start;
+			// Briefly show overlay as feedback
+			setOverlayVisible(true);
+			window.setTimeout(() => setOverlayVisible(false), 3000);
+			// Force re-render so button disabled state updates
+			forceUpdate((n) => n + 1);
+		}
+	}, [chapters, chaptersLoaded]);
+
+	// Keyboard shortcut "N" (FR-003, NFR-003)
+	useEffect(() => {
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key.toLowerCase() === "n") {
+				seekToNextTimestamp();
+			}
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [seekToNextTimestamp]);
 
 	useEffect(() => {
 		if (!id) {
@@ -66,6 +144,11 @@ export default function RecordingPlayerPage() {
 
 				switch (command.action) {
 					case "play":
+						// Spec 011 FR-002: on first play, seek to chapters[0].start (client-side only)
+						if (!hasPlayedOnce && chapters.length > 0) {
+							video.currentTime = chapters[0].start;
+						}
+						setHasPlayedOnce(true);
 						video.play().catch((err) => {
 							setError(`Playback failed: ${err.message}`);
 							reportState("error", video.currentTime, err.message);
@@ -102,6 +185,8 @@ export default function RecordingPlayerPage() {
 			if (now - lastReportTimestamp >= 2000) {
 				lastReportTimestamp = now;
 				reportState(video.paused ? "paused" : "playing", video.currentTime);
+				// Force re-render so button disabled state updates with position
+				forceUpdate((n) => n + 1);
 			}
 		};
 
@@ -119,7 +204,26 @@ export default function RecordingPlayerPage() {
 			video.removeEventListener("error", onError);
 			video.removeEventListener("timeupdate", onTimeUpdate);
 		};
-	}, [id, reportState]);
+	}, [id, reportState, chapters, hasPlayedOnce]);
+
+	// Compute next chapter availability for button disabled state (FR-004, FR-004a)
+	const video = videoRef.current;
+	const currentPosition = video?.currentTime ?? 0;
+	const hasNextTimestamp =
+		chaptersLoaded && chapters.length > 0 && nextTimestamp(chapters, currentPosition) !== null;
+	const isButtonDisabled = !hasNextTimestamp || chaptersNotGenerated;
+
+	// Mouse movement handler — show overlay on hover (NFR-003)
+	const overlayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const onMouseMove = useCallback(() => {
+		setOverlayVisible(true);
+		if (overlayTimeoutRef.current) {
+			clearTimeout(overlayTimeoutRef.current);
+		}
+		overlayTimeoutRef.current = setTimeout(() => {
+			setOverlayVisible(false);
+		}, 3000);
+	}, []);
 
 	return (
 		<div
@@ -134,6 +238,7 @@ export default function RecordingPlayerPage() {
 				padding: 0,
 				overflow: "hidden",
 			}}
+			onMouseMove={onMouseMove}
 		>
 			{error ? (
 				<div
@@ -176,6 +281,51 @@ export default function RecordingPlayerPage() {
 					}}
 				>
 					Connecting…
+				</div>
+			)}
+			{/* Next Timestamp button — minimal overlay (Spec 011, FR-003, NFR-003) */}
+			{!error && (overlayVisible || isButtonDisabled) && (
+				<div
+					style={{
+						position: "absolute",
+						bottom: 16,
+						right: 16,
+						display: "flex",
+						flexDirection: "column",
+						alignItems: "flex-end",
+						gap: 4,
+						opacity: isButtonDisabled ? 0.4 : 0.7,
+						transition: "opacity 0.3s",
+					}}
+				>
+					<button
+						type="button"
+						disabled={isButtonDisabled}
+						onClick={seekToNextTimestamp}
+						style={{
+							background: "rgba(255,255,255,0.15)",
+							border: "1px solid rgba(255,255,255,0.3)",
+							borderRadius: 8,
+							color: "#fff",
+							cursor: isButtonDisabled ? "default" : "pointer",
+							fontFamily: "system-ui, sans-serif",
+							fontSize: "0.85rem",
+							padding: "8px 14px",
+						}}
+					>
+						▶▶ Nächster Timestamp
+					</button>
+					{chaptersNotGenerated && (
+						<span
+							style={{
+								color: "#999",
+								fontFamily: "system-ui, sans-serif",
+								fontSize: "0.7rem",
+							}}
+						>
+							Kapitel noch nicht generiert. Bitte zuerst regenerieren.
+						</span>
+					)}
 				</div>
 			)}
 		</div>

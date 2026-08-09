@@ -1,0 +1,638 @@
+openapi: 3.1.0
+info:
+  title: Aither Chapters in Video API
+  version: 1.0.0
+  description: |
+    API for regenerating video recordings with embedded chapter metadata and retrieving chapter lists.
+    Based on Spec 010 (Chapters in Video) and extends Spec 004 (Recording Module) playback endpoints.
+  contact:
+    name: Aither Team
+  x-spec-reference: "specs/010-chapters-in-video/spec.md"
+servers:
+  - url: http://localhost:3000/api
+    description: Development
+  - url: https://aither.example.com/api
+    description: Production
+
+paths:
+  /recording/chapters/{id}:
+    post:
+      summary: Regenerate chaptered video
+      description: |
+        Trigger FFmpeg remux to embed chapter metadata from ffmetadata JSON blob into the recording.
+        Executes synchronously; blocks until remux completes or fails.
+        Requires service token (Gaia token) or admin Clerk session.
+      operationId: regenerateChapteredVideo
+      tags:
+        - Chapters
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Asset ID (recording session ID, e.g., rec_2026-07-13T10-30-00Z)
+          schema:
+            type: string
+            pattern: "^rec_[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}Z$"
+      requestBody:
+        description: Empty body; all input derived from path parameter and stored blob.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        "200":
+          description: Chaptered video successfully generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChapterRegenerationResult"
+              examples:
+                success:
+                  summary: Successful regeneration
+                  value:
+                    assetId: "rec_2026-07-13T10-30-00Z"
+                    muxAssetId: "mux_chapters_rec_2026-07-13T10-30-00Z"
+                    chapterCount: 5
+        "400":
+          description: Invalid request (bad assetId format)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidId:
+                  value:
+                    success: false
+                    error:
+                      code: "INVALID_REQUEST"
+                      message: "Invalid assetId format"
+        "401":
+          description: Unauthorized (missing or invalid token, no admin session)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  value:
+                    success: false
+                    error:
+                      code: "UNAUTHORIZED"
+                      message: "Missing or invalid bearer token"
+        "403":
+          description: Forbidden (authenticated non-admin without service token)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Recording or ffmetadata not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                recordingNotFound:
+                  value:
+                    success: false
+                    error:
+                      code: "RECORDING_NOT_FOUND"
+                      message: "No recording found for assetId"
+                ffmetadataNotFound:
+                  value:
+                    success: false
+                    error:
+                      code: "FFMETADATA_NOT_FOUND"
+                      message: "No ffmetadata JSON blob found for assetId"
+        "409":
+          description: Recording still in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                stillRecording:
+                  value:
+                    success: false
+                    error:
+                      code: "RECORDING_IN_PROGRESS"
+                      message: "Cannot regenerate while recording is still active"
+        "422":
+          description: Invalid or corrupt ffmetadata JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidMetadata:
+                  value:
+                    success: false
+                    error:
+                      code: "FFMETADATA_INVALID"
+                      message: "ffmetadata JSON failed schema validation"
+                      details:
+                        validationErrors:
+                          - "chapters array is required"
+        "503":
+          description: Blob storage unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                storageDown:
+                  value:
+                    success: false
+                    error:
+                      code: "BLOB_STORAGE_UNAVAILABLE"
+                      message: "Vercel Blob Storage temporarily unavailable"
+        "502":
+          description: FFmpeg remux failed or chapter count mismatch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                remuxFailed:
+                  value:
+                    success: false
+                    error:
+                      code: "REMUX_FAILED"
+                      message: "FFmpeg remux failed or chapter validation failed"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerToken: []
+        - adminSession: []
+
+    get:
+      summary: Retrieve chapter list
+      description: |
+        Fetch the chapter list for a chaptered recording.
+        Chapters are sourced from the embedded chapter metadata in the MUX chaptered asset (via ffprobe on the MUX playback URL),
+        not from the ffmetadata JSON blob.
+        Requires service token or admin session.
+      operationId: listChapters
+      tags:
+        - Chapters
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Asset ID (recording session ID)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Chapter list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChapterListResponse"
+              examples:
+                success:
+                  summary: Chapter list with 3 chapters
+                  value:
+                    assetId: "rec_2026-07-13T10-30-00Z"
+                    chapters:
+                      - id: 0
+                        start: 5.0
+                        end: 20.0
+                        title: "Chapter 1: Introduction"
+                      - id: 1
+                        start: 20.0
+                        end: 45.0
+                        title: "Chapter 2: Key Topics"
+                      - id: 2
+                        start: 45.0
+                        end: 7200.0
+                        title: "Chapter 3: Conclusion"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Chaptered video not found (only raw MP4 exists)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                notGenerated:
+                  value:
+                    success: false
+                    error:
+                      code: "CHAPTERS_NOT_GENERATED"
+                      message: "Chaptered video has not been generated yet. Call POST /api/recording/chapters/{id} to regenerate."
+        "502":
+          description: FFmpeg chapter extraction failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerToken: []
+        - adminSession: []
+
+  /recording/playback/play:
+    post:
+      summary: Play / seek (extended for chapters)
+      description: |
+        Play or resume recording playback. Extended to accept optional chapterId to seek to a specific chapter.
+        When chapterId is provided, player seeks to chapter start before playing.
+        (This endpoint is extended from Spec 004; existing fields remain unchanged.)
+      operationId: playRecording
+      tags:
+        - Playback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChapterPlaybackRequest"
+            examples:
+              playFromStart:
+                summary: Play from beginning
+                value:
+                  recordingId: "rec_2026-07-13T10-30-00Z"
+              playChapter:
+                summary: Play chapter 2
+                value:
+                  recordingId: "rec_2026-07-13T10-30-00Z"
+                  chapterId: 1
+      responses:
+        "200":
+          description: Playback command accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChapterPlaybackResult"
+              examples:
+                success:
+                  value:
+                    accepted: true
+                    chapterId: 1
+                    start: 20.0
+                    end: 45.0
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Recording or chapter not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                chapterNotFound:
+                  value:
+                    success: false
+                    error:
+                      code: "CHAPTER_NOT_FOUND"
+                      message: "Chapter ID does not exist for this recording"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerToken: []
+        - adminSession: []
+
+  /recording/stream/{id}:
+    get:
+      summary: Stream recording (extended for chapters)
+      description: |
+        Stream the recording as MP4. Extended to serve the MUX chaptered asset (via CDN redirect/proxy) when available, falling back to the raw MUX asset.
+        Supports HTTP Range requests (206 Partial Content) for seeking (delegated to MUX CDN where applicable).
+        (This endpoint is extended from Spec 004; existing behavior preserved for raw recordings.)
+      operationId: streamRecording
+      tags:
+        - Streaming
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Asset ID
+          schema:
+            type: string
+        - name: Range
+          in: header
+          description: HTTP Range header for partial content requests
+          schema:
+            type: string
+            example: "bytes=0-1023"
+      responses:
+        "200":
+          description: Full recording stream
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: "video/mp4"
+            Content-Length:
+              schema:
+                type: integer
+            Accept-Ranges:
+              schema:
+                type: string
+                example: "bytes"
+        "206":
+          description: Partial content (Range request)
+          headers:
+            Content-Range:
+              schema:
+                type: string
+                example: "bytes 0-1023/2048"
+            Content-Length:
+              schema:
+                type: integer
+        "404":
+          description: Recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "416":
+          description: Range not satisfiable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerToken: []
+        - adminSession: []
+
+  /recording/events:
+    get:
+      summary: SSE stream for playback events (extended for chapters)
+      description: |
+        Server-Sent Events stream for real-time playback commands and events.
+        Extended to emit chapter-boundary events when player reaches a chapter end.
+        (Existing Spec 004 events preserved: play, stop, seek.)
+      operationId: streamPlaybackEvents
+      tags:
+        - Streaming
+      parameters:
+        - name: recordingId
+          in: query
+          required: true
+          description: Recording session ID to stream events for
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream established
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: "text/event-stream"
+            Cache-Control:
+              schema:
+                type: string
+                example: "no-cache"
+            Connection:
+              schema:
+                type: string
+                example: "keep-alive"
+          content:
+            text/event-stream:
+              examples:
+                chapterBoundary:
+                  summary: Chapter boundary event
+                  value: |
+                    event: chapter-boundary
+                    data: {"chapterId": 1, "nextChapterId": 2}
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerToken: []
+        - adminSession: []
+
+components:
+  schemas:
+    ChapterSummary:
+      type: object
+      required:
+        - id
+        - start
+        - end
+        - title
+      properties:
+        id:
+          type: integer
+          minimum: 0
+          description: Zero-based chapter index
+        start:
+          type: number
+          minimum: 0
+          description: Chapter start time in seconds
+        end:
+          type: number
+          description: Chapter end time in seconds (must be > start)
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Chapter title
+    
+    ChapterListResponse:
+      type: object
+      required:
+        - assetId
+        - chapters
+      properties:
+        assetId:
+          type: string
+          description: Recording session ID
+        chapters:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ChapterSummary"
+    
+    ChapterRegenerationResult:
+      type: object
+      required:
+        - assetId
+        - muxAssetId
+        - chapterCount
+      properties:
+        assetId:
+          type: string
+          description: Recording session ID
+        muxAssetId:
+          type: string
+          minLength: 1
+          description: MUX asset id of the uploaded chaptered MP4 (canonical reference; local transient file is deleted after upload)
+        chapterCount:
+          type: integer
+          minimum: 1
+          description: Number of chapters embedded
+    
+    ChapterPlaybackRequest:
+      type: object
+      required:
+        - recordingId
+      properties:
+        recordingId:
+          type: string
+          description: Recording session ID
+        chapterId:
+          type: integer
+          minimum: 0
+          description: Chapter ID to play (optional; if omitted, play from start)
+    
+    ChapterPlaybackResult:
+      type: object
+      required:
+        - accepted
+      properties:
+        accepted:
+          type: boolean
+          enum: [true]
+        chapterId:
+          type: integer
+          minimum: 0
+          description: Echo of requested chapterId (if provided)
+        start:
+          type: number
+          minimum: 0
+          description: Chapter start time in seconds (if chapterId provided)
+        end:
+          type: number
+          description: Chapter end time in seconds (if chapterId provided)
+    
+    ChapterBoundaryEvent:
+      type: object
+      required:
+        - event
+        - chapterId
+      properties:
+        event:
+          type: string
+          enum: ["chapter-boundary"]
+        chapterId:
+          type: integer
+          minimum: 0
+          description: ID of chapter that just ended
+        nextChapterId:
+          type: integer
+          minimum: 0
+          description: ID of next chapter (if exists)
+        timestamp:
+          type: integer
+          description: Server-side timestamp in milliseconds (optional)
+    
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Error code identifier
+              enum:
+                - INVALID_REQUEST
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - RECORDING_NOT_FOUND
+                - FFMETADATA_NOT_FOUND
+                - CHAPTERS_NOT_GENERATED
+                - CHAPTER_NOT_FOUND
+                - RECORDING_IN_PROGRESS
+                - FFMETADATA_INVALID
+                - REMUX_FAILED
+                - BLOB_STORAGE_UNAVAILABLE
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Human-readable error message
+            details:
+              type: object
+              description: Additional error context (optional)
+
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+      description: Service token (Gaia sync token) or bearer token
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: __Secure-auth-token
+      description: Clerk admin session cookie

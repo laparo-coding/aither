@@ -82,7 +82,7 @@ describe("POST /api/recording/playback/play", () => {
 		mockHasConnectedClients.mockReturnValue(true);
 	});
 
-	it("returns 200 with playing state", async () => {
+	it("returns 200 with accepted state", async () => {
 		const { POST } = await import("@/app/api/recording/playback/play/route");
 		const req = createRequest("http://localhost:3000/api/recording/playback/play", "POST", {
 			recordingId: "rec_2025-01-15T10-30-00Z",
@@ -92,7 +92,7 @@ describe("POST /api/recording/playback/play", () => {
 		expect(res.status).toBe(200);
 		const json = await res.json();
 		expect(json.success).toBe(true);
-		expect(json.data).toHaveProperty("status", "playing");
+		expect(json.data).toHaveProperty("accepted", true);
 	});
 
 	it("returns 404 when no player is connected", async () => {

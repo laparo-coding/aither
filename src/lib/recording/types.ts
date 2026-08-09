@@ -5,6 +5,12 @@
 
 import type { z } from "zod";
 import type {
+	ChapterBoundaryEventSchema,
+	ChapterListResponseSchema,
+	ChapterPlaybackRequestSchema,
+	ChapterPlaybackResultSchema,
+	ChapterRegenerationResultSchema,
+	ChapterSummarySchema,
 	FFMetadataChapterSchema,
 	FFMetadataJSONSchema,
 	MuxUploadRequestSchema,
@@ -62,9 +68,19 @@ export type FFMetadataChapter = z.infer<typeof FFMetadataChapterSchema>;
 export type FFMetadataJSON = z.infer<typeof FFMetadataJSONSchema>;
 export type TimestampIngestionResult = z.infer<typeof TimestampIngestionResultSchema>;
 
+// ── Chapter Endpoint Types (Spec 010) ──────────────────────────────────────
+
+export type ChapterSummary = z.infer<typeof ChapterSummarySchema>;
+export type ChapterListResponse = z.infer<typeof ChapterListResponseSchema>;
+export type ChapterRegenerationResult = z.infer<typeof ChapterRegenerationResultSchema>;
+export type ChapterPlaybackRequest = z.infer<typeof ChapterPlaybackRequestSchema>;
+export type ChapterPlaybackResult = z.infer<typeof ChapterPlaybackResultSchema>;
+export type ChapterBoundaryEvent = z.infer<typeof ChapterBoundaryEventSchema>;
+
 // ── SSE Types ─────────────────────────────────────────────────────────────
 
 export type SSECommand =
 	| { action: "play" }
 	| { action: "stop" }
-	| { action: "seek"; position: number };
+	| { action: "seek"; position: number }
+	| { action: "chapter-boundary"; chapterId: number; nextChapterId?: number };

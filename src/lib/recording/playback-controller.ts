@@ -93,7 +93,7 @@ export function closeClientsForRecording(recordingId: string): void {
 /**
  * Send an SSE command to all connected clients for a recording.
  */
-function dispatchSSE(recordingId: string, command: SSECommand): void {
+export function dispatchSSE(recordingId: string, command: SSECommand): void {
 	const clients = sseClients.get(recordingId);
 	if (!clients) return;
 
