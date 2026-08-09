@@ -49,12 +49,16 @@ const publicPaths = new Set([
 	"/api/recording/playback/state",
 ]);
 
-const protectedRegexes = protectedPatterns.map((p) => new RegExp(`^${escapeRegexPattern(p)}$`));
-
-/** Escape special regex characters in a pattern string for literal matching. */
-function escapeRegexPattern(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+// Static regexes keep wildcard behavior explicit and avoid dynamic regex construction.
+const protectedRegexes = [
+	/^\/api\/sync(?:\/.*)?$/,
+	/^\/api\/recordings(?:\/.*)?$/,
+	/^\/api\/recording(?:\/.*)?$/,
+	/^\/sync(?:\/.*)?$/,
+	/^\/recording(?:\/.*)?$/,
+	/^\/api\/service(?:\/.*)?$/,
+	/^\/dashboard(?:\/.*)?$/,
+];
 
 const serviceAuthorizedPaths = new Set(["/api/sync", "/api/slides/view", "/api/slides/controller"]);
 

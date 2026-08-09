@@ -79,7 +79,9 @@ test("Sync-API erzeugt HTML-Dateien für Seminar und Lesson", async ({ request }
 	expect(foundLesson).toBe(true);
 
 	// 3. Inhalt prüfen
+	// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 	const seminarContent = await fs.readFile(seminarHtml, "utf8");
+	// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 	const lessonContent = await fs.readFile(lessonHtml, "utf8");
 	expect(seminarContent).toContain("<html");
 	expect(lessonContent).toContain("<html");

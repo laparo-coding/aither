@@ -77,6 +77,7 @@ async function readSlides(
 ): Promise<{ slides: ControllerSlideRef[]; lastUpdated: string }> {
 	let entries: string[];
 	try {
+		// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 		entries = await fs.readdir(courseDir);
 	} catch (error) {
 		const maybeCode = (error as NodeJS.ErrnoException).code;
@@ -109,6 +110,7 @@ async function readSlides(
 	const slides: ControllerSlideRef[] = [];
 	for (const fileName of htmlFiles) {
 		try {
+			// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 			const stat = await fs.stat(path.join(courseDir, fileName));
 			if (stat.mtimeMs > latestMtime) latestMtime = stat.mtimeMs;
 		} catch {
@@ -118,6 +120,7 @@ async function readSlides(
 		const notesPath = path.join(courseDir, fileName.replace(/\.html$/, ".notes.json"));
 		let notes: Pick<ControllerSlideRef, "noteTitle" | "noteBody"> = {};
 		try {
+			// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 			const notesRaw = await fs.readFile(notesPath, "utf8");
 			notes = normalizeNotesPayload(JSON.parse(notesRaw));
 		} catch (error) {

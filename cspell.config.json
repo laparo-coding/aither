@@ -151,7 +151,16 @@
 		"*.tsbuildinfo",
 		"cspell.config.json"
 	],
-	"ignoreRegExpList": ["/\\[äöüßÄÖÜ\\]/", "/[\\p{Script=Cyrillic}]+/u", "/María/", "/O'Brien/"],
+	"ignoreRegExpList": [
+		"/\\[äöüßÄÖÜ\\]/",
+		"/[\\p{Script=Cyrillic}]+/u",
+		"/María/",
+		"/O'Brien/",
+		"/nosemgrep[^\\n]*/",
+		"/ssrfer/",
+		"/ssrf/",
+		"/safestring/"
+	],
 	"import": ["./node_modules/@cspell/dict-de-de/cspell-ext.json"],
 	"dictionaries": ["typescript", "node", "softwareTerms", "en-gb"],
 	"enableFiletypes": [

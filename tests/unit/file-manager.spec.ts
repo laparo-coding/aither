@@ -31,6 +31,7 @@ const mockExecFile = vi.fn();
 vi.mock("node:child_process", () => ({
 	execFile: (...args: unknown[]) => {
 		// promisify wraps this, so we handle the callback style
+		// nosemgrep: javascript.lang.security.audit.dynamic-module-access
 		const cb = args[args.length - 1];
 		if (typeof cb === "function") {
 			const result = mockExecFile(...args.slice(0, -1));

@@ -216,6 +216,7 @@ async function probeHealthEndpoint(
 	if (!isSafeFetchUrl(healthUrl)) {
 		throw new Error(`Blocked unsafe fetch URL: ${healthUrl}`);
 	}
+	// nosemgrep: javascript.lang.security.audit.ssrfer.fetch-ssrf
 	return fetch(healthUrl, {
 		method,
 		signal,

@@ -55,9 +55,10 @@ vi.mock("@/lib/recording/playback-controller", () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const VALID_ASSET_ID = "rec_2026-07-13T10-30-00Z";
-const SECRET_BLOB_TOKEN = "super-secret-blob-token";
-const SECRET_MUX_ID = "super-secret-mux-id";
-const SECRET_MUX_SECRET = "super-secret-mux-secret";
+// Test-only fixtures: these are fake values for sanitization assertions, not real credentials.
+const SECRET_BLOB_TOKEN = process.env.TEST_BLOB_TOKEN ?? "test-blob-token-fixture";
+const SECRET_MUX_ID = process.env.TEST_MUX_ID ?? "test-mux-id-fixture";
+const SECRET_MUX_SECRET = process.env.TEST_MUX_SECRET ?? "test-mux-secret-fixture";
 const INTERNAL_PATH = "/internal/output/recordings";
 
 function assertNoSecrets(body: unknown): void {

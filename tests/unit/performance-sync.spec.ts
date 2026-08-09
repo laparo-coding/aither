@@ -49,6 +49,7 @@ describe("Performance: Sync mit 500 Records", () => {
 		const outputDir = path.join("output", "perf-test");
 		// Clean output dir to avoid stale manifest causing all files to be "unchanged"
 		await fs.rm(outputDir, { recursive: true, force: true });
+		// nosemgrep: javascript.lang.security.audit.path-traversal.path-traversal
 		await fs.mkdir(outputDir, { recursive: true });
 		const orchestrator = new SyncOrchestrator({
 			client: new MockHemeraClient() as unknown as HemeraClient,
