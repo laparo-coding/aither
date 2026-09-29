@@ -99,6 +99,97 @@ describe("MUX Uploader", () => {
 		expect(result.muxPlaybackUrl).toContain("playback-789");
 	});
 
+	it("requests and waits for a static MP4 rendition when requested", async () => {
+		mockAssetsRetrieve.mockResolvedValueOnce({
+			id: "asset-456",
+			status: "ready",
+			static_renditions: {
+				files: [{ name: "highest.mp4", status: "ready" }],
+			},
+		});
+
+		const { uploadToMux } = await import("@/lib/recording/mux-uploader");
+		const result = await uploadToMux("/tmp/test.mp4", { staticRendition: "highest" });
+
+		expect(mockUploadsCreate).toHaveBeenCalledWith(
+			expect.objectContaining({
+				new_asset_settings: expect.objectContaining({
+					static_renditions: [{ resolution: "highest" }],
+				}),
+			}),
+		);
+		expect(result.muxPlaybackUrl).toBe("https://stream.mux.com/playback-789/highest.mp4");
+	});
+
+	it("keeps polling while the requested static rendition is preparing", async () => {
+		vi.useFakeTimers();
+		mockAssetsRetrieve
+			.mockResolvedValueOnce({
+				id: "asset-456",
+				status: "ready",
+				static_renditions: {
+					files: [{ name: "highest.mp4", status: "preparing" }],
+				},
+			})
+			.mockResolvedValueOnce({
+				id: "asset-456",
+				status: "ready",
+				static_renditions: {
+					files: [{ name: "highest.mp4", status: "ready" }],
+				},
+			});
+
+		try {
+			const { uploadToMux } = await import("@/lib/recording/mux-uploader");
+			const resultPromise = uploadToMux("/tmp/test.mp4", { staticRendition: "highest" });
+			await vi.advanceTimersByTimeAsync(3000);
+			const result = await resultPromise;
+
+			expect(mockAssetsRetrieve).toHaveBeenCalledTimes(3);
+			expect(result.muxPlaybackUrl).toBe("https://stream.mux.com/playback-789/highest.mp4");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("gives the static rendition its own timeout after the asset is ready", async () => {
+		vi.useFakeTimers();
+		for (let poll = 0; poll < 99; poll++) {
+			mockUploadsRetrieve.mockResolvedValueOnce({ id: "upload-123", status: "waiting" });
+		}
+		mockUploadsRetrieve.mockResolvedValueOnce({
+			id: "upload-123",
+			asset_id: "asset-456",
+			status: "asset_created",
+		});
+		mockAssetsRetrieve
+			.mockResolvedValueOnce({
+				id: "asset-456",
+				status: "ready",
+				static_renditions: {
+					files: [{ name: "highest.mp4", status: "preparing" }],
+				},
+			})
+			.mockResolvedValueOnce({
+				id: "asset-456",
+				status: "ready",
+				static_renditions: {
+					files: [{ name: "highest.mp4", status: "ready" }],
+				},
+			});
+
+		try {
+			const { uploadToMux } = await import("@/lib/recording/mux-uploader");
+			const resultPromise = uploadToMux("/tmp/test.mp4", { staticRendition: "highest" });
+			await vi.advanceTimersByTimeAsync(300_000);
+			const result = await resultPromise;
+
+			expect(result.muxPlaybackUrl).toBe("https://stream.mux.com/playback-789/highest.mp4");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it("throws MUX_UPLOAD_FAILED when upload creation fails", async () => {
 		mockUploadsCreate.mockRejectedValueOnce(new Error("MUX API error"));
 

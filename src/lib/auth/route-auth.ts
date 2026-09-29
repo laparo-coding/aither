@@ -3,8 +3,6 @@
 // Provides a single mockable entry point for all API routes.
 // ---------------------------------------------------------------------------
 
-const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_");
-
 /**
  * Retrieve session auth context in a route handler.
  *
@@ -14,15 +12,11 @@ const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith(
  * Returns `null` when no user is signed in, otherwise the
  * full Clerk session object including `sessionClaims`.
  *
- * In development without a valid Clerk key, returns a mock admin session
- * so local dashboard routes work without authentication.
+ * In development with the explicit bypass flag, returns a mock admin session
+ * so local routes work without an interactive sign-in.
  */
 export async function getRouteAuth(): Promise<unknown> {
-	if (
-		!hasClerkKey &&
-		process.env.NODE_ENV === "development" &&
-		process.env.ENABLE_DEV_AUTH_BYPASS === "true"
-	) {
+	if (process.env.NODE_ENV === "development" && process.env.ENABLE_DEV_AUTH_BYPASS === "true") {
 		console.warn("[route-auth] Dev auth bypass is active — returning mock admin session");
 		return {
 			userId: "dev-user",

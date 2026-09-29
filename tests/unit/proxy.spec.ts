@@ -1,12 +1,77 @@
-import { isAuthorizedSyncServiceRequest } from "@/proxy";
-import { NextRequest } from "next/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { getRouteAuth } from "@/lib/auth/route-auth";
+import middleware, { isAuthorizedSyncServiceRequest, isDevAuthBypassEnabled } from "@/proxy";
+import { type NextFetchEvent, NextRequest } from "next/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 function createRequest(pathname: string, authorization?: string): NextRequest {
 	return new NextRequest(new URL(`http://localhost:3000${pathname}`), {
 		headers: authorization ? { authorization } : undefined,
 	});
 }
+
+afterEach(() => {
+	vi.unstubAllEnvs();
+});
+
+describe("development auth bypass", () => {
+	it("allows protected routes only when explicitly enabled without a Clerk key in development", async () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "");
+		vi.stubEnv("ENABLE_DEV_AUTH_BYPASS", "true");
+
+		expect(isDevAuthBypassEnabled()).toBe(true);
+
+		const response = await middleware(
+			createRequest("/recording/player/test"),
+			{} as NextFetchEvent,
+		);
+		expect(response.headers.get("x-middleware-next")).toBe("1");
+	});
+
+	it("does not bypass protected routes in production", async () => {
+		vi.stubEnv("NODE_ENV", "production");
+		vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "");
+		vi.stubEnv("ENABLE_DEV_AUTH_BYPASS", "true");
+
+		expect(isDevAuthBypassEnabled()).toBe(false);
+
+		const response = await middleware(
+			createRequest("/recording/player/test"),
+			{} as NextFetchEvent,
+		);
+		expect(response.status).toBe(503);
+	});
+
+	it("explicitly bypasses Clerk when enabled in development and returns the mock admin session", async () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "pk_test_configured");
+		vi.stubEnv("ENABLE_DEV_AUTH_BYPASS", "true");
+
+		expect(isDevAuthBypassEnabled()).toBe(true);
+
+		const response = await middleware(
+			createRequest("/recording/player/test"),
+			{} as NextFetchEvent,
+		);
+		expect(response.headers.get("x-middleware-next")).toBe("1");
+		await expect(getRouteAuth()).resolves.toMatchObject({
+			sessionClaims: { metadata: { role: "admin" } },
+		});
+	});
+
+	it("does not bypass authentication in development without the flag", async () => {
+		vi.stubEnv("NODE_ENV", "development");
+		vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "");
+		vi.stubEnv("ENABLE_DEV_AUTH_BYPASS", "false");
+
+		expect(isDevAuthBypassEnabled()).toBe(false);
+		const response = await middleware(
+			createRequest("/recording/player/test"),
+			{} as NextFetchEvent,
+		);
+		expect(response.status).toBe(503);
+	});
+});
 
 describe("isAuthorizedSyncServiceRequest", () => {
 	afterEach(() => {

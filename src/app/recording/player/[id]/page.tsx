@@ -19,6 +19,13 @@ import type { ChapterSummary } from "@/lib/recording/types";
 
 type SSECommand = { action: "play" } | { action: "stop" } | { action: "seek"; position: number };
 
+function chapterAtPosition(
+	chapters: ChapterSummary[],
+	position: number,
+): ChapterSummary | undefined {
+	return chapters.find((chapter) => position >= chapter.start && position < chapter.end);
+}
+
 export default function RecordingPlayerPage() {
 	const params = useParams<{ id: string }>();
 	const id = params.id;
@@ -34,6 +41,7 @@ export default function RecordingPlayerPage() {
 	const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
 	const [overlayVisible, setOverlayVisible] = useState(false);
 	const [, forceUpdate] = useState(0);
+	const activeChapterIdRef = useRef<number | null>(null);
 
 	// Report player state back to the server
 	const reportState = useCallback(
@@ -100,6 +108,7 @@ export default function RecordingPlayerPage() {
 		const next = nextTimestamp(chapters, video.currentTime);
 		if (next) {
 			video.currentTime = next.start;
+			activeChapterIdRef.current = next.id;
 			// Briefly show overlay as feedback
 			setOverlayVisible(true);
 			window.setTimeout(() => setOverlayVisible(false), 3000);
@@ -127,6 +136,13 @@ export default function RecordingPlayerPage() {
 
 		const video = videoRef.current;
 		if (!video) return;
+		if (
+			chapters.length > 0 &&
+			activeChapterIdRef.current === null &&
+			(hasPlayedOnce || !video.paused)
+		) {
+			activeChapterIdRef.current = chapterAtPosition(chapters, video.currentTime)?.id ?? null;
+		}
 
 		// Set video source to the streaming endpoint
 		video.src = `/api/recording/stream/${id}`;
@@ -146,7 +162,12 @@ export default function RecordingPlayerPage() {
 					case "play":
 						// Spec 011 FR-002: on first play, seek to chapters[0].start (client-side only)
 						if (!hasPlayedOnce && chapters.length > 0) {
-							video.currentTime = chapters[0].start;
+							const firstChapter = chapters[0];
+							video.currentTime = firstChapter.start;
+							activeChapterIdRef.current = firstChapter.id;
+						} else if (activeChapterIdRef.current === null) {
+							activeChapterIdRef.current =
+								chapterAtPosition(chapters, video.currentTime)?.id ?? null;
 						}
 						setHasPlayedOnce(true);
 						video.play().catch((err) => {
@@ -159,6 +180,7 @@ export default function RecordingPlayerPage() {
 						break;
 					case "seek":
 						video.currentTime = command.position;
+						activeChapterIdRef.current = chapterAtPosition(chapters, command.position)?.id ?? null;
 						break;
 				}
 			} catch {
@@ -171,9 +193,17 @@ export default function RecordingPlayerPage() {
 		};
 
 		// Video event listeners for state reporting
-		const onPlay = () => reportState("playing", video.currentTime);
+		const onPlay = () => {
+			if (activeChapterIdRef.current === null) {
+				activeChapterIdRef.current = chapterAtPosition(chapters, video.currentTime)?.id ?? null;
+			}
+			reportState("playing", video.currentTime);
+		};
 		const onPause = () => reportState("paused", video.currentTime);
 		const onEnded = () => reportState("ended", video.currentTime);
+		const onSeeking = () => {
+			activeChapterIdRef.current = chapterAtPosition(chapters, video.currentTime)?.id ?? null;
+		};
 		const onError = () => {
 			const msg = "Video playback error";
 			setError(msg);
@@ -181,6 +211,14 @@ export default function RecordingPlayerPage() {
 		};
 		let lastReportTimestamp = 0;
 		const onTimeUpdate = () => {
+			const activeChapter = chapters.find((chapter) => chapter.id === activeChapterIdRef.current);
+			if (activeChapter && video.currentTime >= activeChapter.end) {
+				video.currentTime = activeChapter.end;
+				activeChapterIdRef.current = null;
+				video.pause();
+				return;
+			}
+
 			const now = Date.now();
 			if (now - lastReportTimestamp >= 2000) {
 				lastReportTimestamp = now;
@@ -193,6 +231,7 @@ export default function RecordingPlayerPage() {
 		video.addEventListener("play", onPlay);
 		video.addEventListener("pause", onPause);
 		video.addEventListener("ended", onEnded);
+		video.addEventListener("seeking", onSeeking);
 		video.addEventListener("error", onError);
 		video.addEventListener("timeupdate", onTimeUpdate);
 
@@ -201,6 +240,7 @@ export default function RecordingPlayerPage() {
 			video.removeEventListener("play", onPlay);
 			video.removeEventListener("pause", onPause);
 			video.removeEventListener("ended", onEnded);
+			video.removeEventListener("seeking", onSeeking);
 			video.removeEventListener("error", onError);
 			video.removeEventListener("timeupdate", onTimeUpdate);
 		};

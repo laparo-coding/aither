@@ -273,7 +273,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 	let muxAssetId: string;
 	let muxPlaybackUrl: string;
 	try {
-		const uploadResult = await uploadToMux(transientOutputPath);
+		const uploadResult = await uploadToMux(transientOutputPath, { staticRendition: "highest" });
 		muxAssetId = uploadResult.muxAssetId;
 		muxPlaybackUrl = uploadResult.muxPlaybackUrl;
 	} catch (err) {

@@ -41,6 +41,7 @@
 			"node_modules/",
 			".next/",
 			".vscode/",
+			".kilo/",
 			"output/",
 			"dist/",
 			"build/",
@@ -48,5 +49,14 @@
 			"*.min.js",
 			"specs/"
 		]
-	}
+	},
+	"overrides": [
+		{
+			"include": [".codacy/*.json"],
+			"formatter": {
+				"indentStyle": "space",
+				"indentWidth": 2
+			}
+		}
+	]
 }
