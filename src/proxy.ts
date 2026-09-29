@@ -6,7 +6,13 @@
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_");
+function hasClerkKey(): boolean {
+	return !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_");
+}
+
+export function isDevAuthBypassEnabled(): boolean {
+	return process.env.NODE_ENV === "development" && process.env.ENABLE_DEV_AUTH_BYPASS === "true";
+}
 
 function timingSafeEqualString(left: string, right: string): boolean {
 	const encoder = new TextEncoder();
@@ -149,7 +155,11 @@ export default async function middleware(req: NextRequest, ev: NextFetchEvent) {
 		return NextResponse.next();
 	}
 
-	if (!hasClerkKey) {
+	if (isDevAuthBypassEnabled()) {
+		return NextResponse.next();
+	}
+
+	if (!hasClerkKey()) {
 		if (isProtectedPath(req.nextUrl.pathname)) {
 			console.error(
 				"[proxy] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing — blocking protected route %s",

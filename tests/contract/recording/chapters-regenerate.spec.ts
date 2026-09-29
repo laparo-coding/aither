@@ -185,6 +185,10 @@ describe("POST /api/recording/chapters/[id] — success path (T010)", () => {
 		expect(data).toHaveProperty("assetId", VALID_ASSET_ID);
 		expect(data).toHaveProperty("muxAssetId");
 		expect(data).toHaveProperty("chapterCount", 2);
+		expect(mockUploadToMux).toHaveBeenCalledWith(
+			`output/recordings/${VALID_ASSET_ID}.chapters.mp4`,
+			{ staticRendition: "highest" },
+		);
 	});
 });
 

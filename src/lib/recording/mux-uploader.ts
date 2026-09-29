@@ -29,6 +29,10 @@ export interface MuxUploadResult {
 	muxPlaybackUrl: string;
 }
 
+export interface MuxUploadOptions {
+	staticRendition?: "highest";
+}
+
 /**
  * Upload a local MP4 file to MUX.
  *
@@ -43,7 +47,10 @@ export interface MuxUploadResult {
  * @throws Error with "MUX_NOT_CONFIGURED:" if credentials missing
  * @throws Error with "MUX_UPLOAD_FAILED:" on any MUX API failure
  */
-export async function uploadToMux(filePath: string): Promise<MuxUploadResult> {
+export async function uploadToMux(
+	filePath: string,
+	options: MuxUploadOptions = {},
+): Promise<MuxUploadResult> {
 	// Verify file exists
 	try {
 		await stat(filePath);
@@ -65,6 +72,9 @@ export async function uploadToMux(filePath: string): Promise<MuxUploadResult> {
 			new_asset_settings: {
 				playback_policy: ["public"],
 				encoding_tier: "baseline",
+				...(options.staticRendition && {
+					static_renditions: [{ resolution: options.staticRendition }],
+				}),
 			},
 			cors_origin: "*",
 		});
@@ -104,7 +114,7 @@ export async function uploadToMux(filePath: string): Promise<MuxUploadResult> {
 	}
 
 	// Step 3: Poll for asset readiness (max 5 minutes)
-	const assetId = await pollForAsset(mux, upload.id, 300_000);
+	const assetId = await pollForAsset(mux, upload.id, 300_000, options.staticRendition);
 
 	// Step 4: Get playback URL
 	let asset: Awaited<ReturnType<typeof mux.video.assets.retrieve>>;
@@ -121,7 +131,9 @@ export async function uploadToMux(filePath: string): Promise<MuxUploadResult> {
 		throw new Error("MUX_UPLOAD_FAILED: No playback ID found on asset");
 	}
 
-	const muxPlaybackUrl = `https://stream.mux.com/${playbackId}.m3u8`;
+	const muxPlaybackUrl = options.staticRendition
+		? `https://stream.mux.com/${playbackId}/${options.staticRendition}.mp4`
+		: `https://stream.mux.com/${playbackId}.m3u8`;
 
 	return {
 		muxAssetId: assetId,
@@ -132,13 +144,19 @@ export async function uploadToMux(filePath: string): Promise<MuxUploadResult> {
 /**
  * Poll MUX upload status until asset is ready.
  */
-async function pollForAsset(mux: Mux, uploadId: string, timeoutMs: number): Promise<string> {
+async function pollForAsset(
+	mux: Mux,
+	uploadId: string,
+	timeoutMs: number,
+	staticRendition?: MuxUploadOptions["staticRendition"],
+): Promise<string> {
 	const start = Date.now();
+	let staticRenditionStart: number | null = null;
 	const pollInterval = 3_000;
 	const maxConsecutiveFailures = 5;
 	let consecutiveFailures = 0;
 
-	while (Date.now() - start < timeoutMs) {
+	while (Date.now() - (staticRenditionStart ?? start) < timeoutMs) {
 		let uploadStatus: Awaited<ReturnType<typeof mux.video.uploads.retrieve>>;
 		try {
 			uploadStatus = await mux.video.uploads.retrieve(uploadId);
@@ -157,12 +175,9 @@ async function pollForAsset(mux: Mux, uploadId: string, timeoutMs: number): Prom
 
 		if (uploadStatus.asset_id && uploadStatus.status === "asset_created") {
 			// Check if asset is ready
+			let asset: Awaited<ReturnType<typeof mux.video.assets.retrieve>>;
 			try {
-				const asset = await mux.video.assets.retrieve(uploadStatus.asset_id);
-				consecutiveFailures = 0;
-				if (asset.status === "ready") {
-					return uploadStatus.asset_id;
-				}
+				asset = await mux.video.assets.retrieve(uploadStatus.asset_id);
 			} catch (err) {
 				consecutiveFailures++;
 				if (consecutiveFailures >= maxConsecutiveFailures) {
@@ -174,6 +189,26 @@ async function pollForAsset(mux: Mux, uploadId: string, timeoutMs: number): Prom
 				await new Promise((resolve) => setTimeout(resolve, pollInterval));
 				continue;
 			}
+			consecutiveFailures = 0;
+
+			if (asset.status === "ready") {
+				if (!staticRendition) {
+					return uploadStatus.asset_id;
+				}
+				staticRenditionStart ??= Date.now();
+
+				const rendition = asset.static_renditions?.files?.find(
+					(file) => file.name === `${staticRendition}.mp4`,
+				);
+				if (rendition?.status === "ready") {
+					return uploadStatus.asset_id;
+				}
+				if (rendition?.status === "errored" || rendition?.status === "skipped") {
+					throw new Error(
+						`MUX_UPLOAD_FAILED: Static rendition ${staticRendition}.mp4 ${rendition.status}`,
+					);
+				}
+			}
 		}
 
 		if (uploadStatus.status === "errored") {
@@ -183,5 +218,9 @@ async function pollForAsset(mux: Mux, uploadId: string, timeoutMs: number): Prom
 		await new Promise((resolve) => setTimeout(resolve, pollInterval));
 	}
 
-	throw new Error("MUX_UPLOAD_FAILED: Asset did not become ready within timeout");
+	throw new Error(
+		staticRenditionStart
+			? "MUX_UPLOAD_FAILED: Static rendition did not become ready within timeout"
+			: "MUX_UPLOAD_FAILED: Asset did not become ready within timeout",
+	);
 }
