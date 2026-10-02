@@ -1,0 +1,36 @@
+[Unit]
+Description=Aither Transcription Worker (Feature 012)
+Documentation=file:///opt/aither/specs/012-video-transcription/quickstart.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aither
+Group=aither
+WorkingDirectory=/opt/aither
+
+# Server-only secrets arrive through this root-owned, permission-restricted
+# EnvironmentFile outside the repository (FR-026). The file must never be
+# versioned or world-readable.
+EnvironmentFile=/etc/aither/transcription-worker.env
+
+# Production: Run compiled JS (NOT tsx). Build with "npm run build:worker" first.
+ExecStart=/usr/bin/node dist/scripts/transcription-worker.js
+Restart=on-failure
+RestartSec=10
+
+# The worker resumes from canonical Hemera state after restart; no local
+# durable state exists (Constitution VII).
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/aither/output
+
+[Install]
+WantedBy=multi-user.target

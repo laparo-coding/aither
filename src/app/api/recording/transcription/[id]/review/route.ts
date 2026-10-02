@@ -1,0 +1,122 @@
+// ---------------------------------------------------------------------------
+// Transcription Review Route (Aither Admin)
+// Task: T025 [US1] — Authorizes an Aither admin, validates distinct speaker
+// IDs, persists the approved mapping/reviewer/timestamp to Hemera, and
+// resumes publication only after explicit approval (FR-014). The approved
+// mapping is authoritative; later callbacks cannot overwrite it.
+// ---------------------------------------------------------------------------
+
+import { getRouteAuth } from "@/lib/auth/route-auth";
+import { createHemeraSeminarRecordingClient } from "@/lib/transcription/hemera-seminar-client";
+import { OperatorReviewSchema } from "@/lib/transcription/schemas";
+import type { SeminarRecordingWorkflow } from "@/lib/transcription/types";
+import { type NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * PUT /api/recording/transcription/[id]/review
+ * Body: { bookingId, participantSpeakerId, leaderSpeakerId, approve: true }
+ */
+export async function PUT(
+	request: NextRequest,
+	{ params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+	const { id: recordingId } = await params;
+
+	// Restrict review to authorized operators (FR-014)
+	const auth = (await getRouteAuth()) as {
+		userId?: string;
+		sessionClaims?: { metadata?: { role?: string; userId?: string } };
+	} | null;
+	if (!auth?.sessionClaims?.metadata || auth.sessionClaims.metadata.role !== "admin") {
+		return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+	}
+
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+	}
+
+	const parsed = OperatorReviewSchema.safeParse(body);
+	if (!parsed.success) {
+		return NextResponse.json({ error: "Invalid review payload" }, { status: 422 });
+	}
+
+	const { bookingId, participantSpeakerId, leaderSpeakerId } = parsed.data;
+
+	// Reject same-ID mappings (FR-004)
+	if (participantSpeakerId === leaderSpeakerId) {
+		return NextResponse.json(
+			{ error: "Both roles must map to distinct speaker IDs" },
+			{ status: 422 },
+		);
+	}
+
+	// Load the current workflow from Hemera and verify it is awaiting review
+	const hemera = createHemeraSeminarRecordingClient();
+	let workflow: SeminarRecordingWorkflow;
+	try {
+		workflow = await hemera.getWorkflow(bookingId, recordingId);
+	} catch (err) {
+		const status = (err as { status?: number }).status ?? 0;
+		if (status === 404) {
+			return NextResponse.json({ error: "Workflow not found" }, { status: 404 });
+		}
+		console.error("[review] Hemera getWorkflow error:", err);
+		return NextResponse.json(
+			{ error: "Hemera unavailable" },
+			{ status: status >= 500 ? 503 : 502 },
+		);
+	}
+
+	if (workflow.status !== "review_required") {
+		return NextResponse.json(
+			{ error: `Workflow is not reviewable (current status: ${workflow.status})` },
+			{ status: 409 },
+		);
+	}
+
+	// Persist the approved mapping to Hemera as the authoritative record
+	const reviewedAt = new Date().toISOString();
+	const operatorId = String(auth.sessionClaims.metadata.userId ?? auth.userId ?? "unknown-admin");
+	const idempotencyKey = `${bookingId}:${recordingId}:review`;
+
+	try {
+		await hemera.upsertWorkflow(
+			bookingId,
+			recordingId,
+			{
+				status: "publishing",
+				recordingDate: workflow.recordingDate,
+				reviewedSpeakerMapping: {
+					[leaderSpeakerId]: "Seminarleiter",
+					[participantSpeakerId]: "Teilnehmerin",
+				},
+				reviewedBy: operatorId,
+				reviewedAt,
+			},
+			idempotencyKey,
+		);
+	} catch (err) {
+		console.error("[review] Failed to persist approval:", err);
+		return NextResponse.json({ error: "Failed to persist review" }, { status: 502 });
+	}
+
+	return NextResponse.json(
+		{
+			accepted: true,
+			recordingId,
+			bookingId,
+			reviewedSpeakerMapping: {
+				[leaderSpeakerId]: "Seminarleiter",
+				[participantSpeakerId]: "Teilnehmerin",
+			},
+			reviewedBy: operatorId,
+			reviewedAt,
+		},
+		{ status: 200 },
+	);
+}

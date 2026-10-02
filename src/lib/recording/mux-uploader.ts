@@ -11,6 +11,12 @@ import { loadConfig } from "@/lib/config";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import Mux from "@mux/mux-node";
 
+// Feature 012: stable playback reference & full-video JWT TTL helpers
+export {
+	buildStablePlaybackReference,
+	computeMuxTokenTtlSeconds,
+} from "./mux-uploader-signed";
+
 /** Create a MUX client using credentials from config */
 function createMuxClient(): Mux {
 	const config = loadConfig();

@@ -6,6 +6,7 @@
 
 import { randomInt } from "node:crypto";
 import Rollbar from "rollbar";
+import { resolveKeychainEnvironment } from "../keychain-env";
 import { isTelemetryConsentGranted } from "./privacy";
 
 interface RollbarTestInstance {
@@ -32,6 +33,9 @@ const noopInstance: RollbarTestInstance = {
 	},
 };
 
+if (typeof window === "undefined") {
+	resolveKeychainEnvironment();
+}
 // ── Enablement rules ──────────────────────────────────────────────────────
 
 const isE2EMode = process.env.E2E_TEST === "1";

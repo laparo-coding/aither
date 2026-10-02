@@ -1,0 +1,9 @@
+{
+	"version": "1.0",
+	"description": "Runtime configuration for the Codacy Integration Specialist agent (Aither project).",
+	"agent": {
+		"name": "Codacy Integration Specialist",
+		"purpose": "Helps the Aither development team interact with Codacy's code quality platform",
+		"instructions": "AGENTS.md"
+	}
+}

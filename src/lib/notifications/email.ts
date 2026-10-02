@@ -4,14 +4,14 @@
 // ---------------------------------------------------------------------------
 
 import { loadConfig } from "@/lib/config";
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 let failureCount = 0;
 
 /** Lazily created transport — avoids reading env at module load time. */
-let _transport: nodemailer.Transporter | null = null;
+let _transport: Transporter | null = null;
 
-function getTransport(): nodemailer.Transporter {
+function getTransport(): Transporter {
 	if (_transport) return _transport;
 	const cfg = loadConfig();
 	// secure: true für Port 465 (SMTPS), sonst aus Config oder false

@@ -11,10 +11,10 @@ LOCAL=$(git rev-parse @)
 REMOTE=$(git rev-parse @{u})
 BASE=$(git merge-base @ @{u})
 
-if [ $LOCAL = $REMOTE ]; then
+if [ "$LOCAL" = "$REMOTE" ]; then
   echo "$(date): Already up to date."
   exit 0
-elif [ $LOCAL = $BASE ]; then
+elif [ "$LOCAL" = "$BASE" ]; then
   echo "$(date): Update available – pulling it."
   git pull origin main  # Or your branch
   npm ci  # Or npm install --production
