@@ -67,7 +67,7 @@ ffmetadata JSON blob.
 | `403` | `FORBIDDEN` | Authenticated Clerk session that is not `admin` and no valid service token. |
 | `404` | `NO_ACTIVE_RECORDING` | No recording session with status `recording`/`starting`. No blob write. |
 | `429` | `TOO_MANY_REQUESTS` | >60 requests/minute per authenticated identity (service token or Clerk `userId` for admin sessions). Includes `Retry-After` header. |
-| `503` | `BLOB_STORAGE_UNAVAILABLE` | `BLOB_READ_WRITE_TOKEN` missing, or blob read/write failed. |
+| `503` | `BLOB_STORAGE_UNAVAILABLE` | Blob token missing (`BLOB_READ_WRITE_TIMESTAMP_TOKEN` or legacy `BLOB_READ_WRITE_TOKEN`), or blob read/write failed. |
 | `500` | `INTERNAL_ERROR` | Unexpected failure. Reported to Rollbar. |
 
 ### Error Envelope
@@ -90,5 +90,5 @@ ffmetadata JSON blob.
 2. `data.chapterId` equals the `id` of the newly appended chapter.
 3. `data.blobKey` is the deterministic blob path (`ffmetadata/<assetId>.json`); no direct URL is returned.
 3. Chapters remain strictly increasing by `start` after every accepted request.
-4. Responses never contain bearer tokens, `URANOS_SYNC_TOKEN`, `BLOB_READ_WRITE_TOKEN`, or absolute filesystem paths.
+4. Responses never contain bearer tokens, `URANOS_SYNC_TOKEN`, blob tokens (`BLOB_READ_WRITE_TIMESTAMP_TOKEN`/`BLOB_READ_WRITE_TOKEN`), or absolute filesystem paths.
 5. Concurrent requests for the same `assetId` do not drop chapters (serialized).

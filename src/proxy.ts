@@ -53,7 +53,12 @@ const publicPaths = new Set([
 	"/api/recording/playback/rewind",
 	"/api/recording/playback/forward",
 	"/api/recording/playback/state",
+	"/api/service/seminar-document-access",
 ]);
+
+export function isClerkAuthBypassedPath(pathname: string): boolean {
+	return publicPaths.has(pathname) || /^\/api\/service\/seminar-recordings\/[^/]+$/.test(pathname);
+}
 
 // Static regexes keep wildcard behavior explicit and avoid dynamic regex construction.
 const protectedRegexes = [
@@ -69,7 +74,7 @@ const protectedRegexes = [
 const serviceAuthorizedPaths = new Set(["/api/sync", "/api/slides/view", "/api/slides/controller"]);
 
 function isProtectedPath(pathname: string): boolean {
-	if (publicPaths.has(pathname)) return false;
+	if (isClerkAuthBypassedPath(pathname)) return false;
 	return protectedRegexes.some((re) => re.test(pathname));
 }
 
@@ -122,7 +127,7 @@ async function getClerkHandler(): Promise<
 						return NextResponse.next();
 					}
 
-					if (isProtectedRoute(r) && !publicPaths.has(r.nextUrl.pathname)) {
+					if (isProtectedRoute(r) && !isClerkAuthBypassedPath(r.nextUrl.pathname)) {
 						await auth.protect();
 					}
 				});

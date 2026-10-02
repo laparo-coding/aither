@@ -6,6 +6,7 @@
 
 import { randomInt } from "node:crypto";
 import Rollbar from "rollbar";
+import { resolveKeychainEnvironment } from "../keychain-env";
 import { isTelemetryConsentGranted } from "./privacy";
 
 interface RollbarTestInstance {
@@ -32,6 +33,9 @@ const noopInstance: RollbarTestInstance = {
 	},
 };
 
+if (typeof window === "undefined") {
+	resolveKeychainEnvironment();
+}
 // ── Enablement rules ──────────────────────────────────────────────────────
 
 const isE2EMode = process.env.E2E_TEST === "1";
@@ -82,6 +86,17 @@ const CLIENT_SCRUB_FIELDS = [
 export function isExplicitlyEnabled(name: string): boolean {
 	const value = process.env[name];
 	return value === "1" || value === "true";
+}
+
+/**
+ * Evaluate a Rollbar enablement flag with the same semantics as the server
+ * schema in src/lib/config.ts (envBool(true)): "1"/"true" enable, "0"/"false"
+ * disable, and a missing flag defaults to enabled.
+ */
+function isRollbarFlagEnabled(name: string): boolean {
+	const value = process.env[name];
+	if (value === "0" || value === "false") return false;
+	return true;
 }
 
 function redactSensitiveFields(value: unknown): unknown {
@@ -179,7 +194,7 @@ const clientRollbarEnabled = isClientRollbarEnabled({
 	isTestMode,
 	isE2EMode,
 	isExplicitlyDisabled: isClientExplicitlyDisabled,
-	publicEnabled: isExplicitlyEnabled("NEXT_PUBLIC_ROLLBAR_ENABLED"),
+	publicEnabled: isRollbarFlagEnabled("NEXT_PUBLIC_ROLLBAR_ENABLED"),
 	clientToken: clientRollbarToken,
 });
 

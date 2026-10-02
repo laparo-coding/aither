@@ -12,11 +12,19 @@ servers:
   - url: http://localhost:3500
     description: Local development
 
+security:
+  - adminAuth: []
+
+tags:
+  - name: sync
+    description: Data synchronization operations
+
 paths:
   /api/sync:
     post:
       operationId: triggerSync
       summary: Trigger data sync
+      tags: [sync]
       description: |
         Triggers a full or incremental data sync cycle. Fetches the next upcoming
         course from Hemera, including all participants and their preparations.
@@ -72,6 +80,7 @@ paths:
     get:
       operationId: getSyncStatus
       summary: Get sync status
+      tags: [sync]
       description: |
         Returns the status of the last (or currently running) sync operation,
         including the selected course, participant count, and file counts.
@@ -166,10 +175,9 @@ paths:
 components:
   securitySchemes:
     adminAuth:
-      type: apiKey
-      in: header
-      name: Authorization
-      description: Admin authentication token
+      type: http
+      scheme: bearer
+      description: Admin authentication token (Bearer scheme)
 
   schemas:
     SyncStartedResponse:
@@ -260,6 +268,7 @@ components:
           description: Files not rewritten (content unchanged)
         errors:
           type: array
+          maxItems: 100
           items:
             $ref: '#/components/schemas/SyncError'
 
@@ -309,70 +318,3 @@ components:
         version:
           type: string
           description: API version (optional)
-
-    # --- Hemera API types (for reference / contract testing) ---
-
-    ServiceCourseDetail:
-      type: object
-      description: |
-        Response shape from Hemera GET /api/service/courses/[id]
-        (after endpoint extension). Used by Aither to get course + participants.
-      required: [id, title, slug, level, startDate, endDate, participants]
-      properties:
-        id:
-          type: string
-        title:
-          type: string
-        slug:
-          type: string
-        level:
-          type: string
-          enum: [BEGINNER, INTERMEDIATE, ADVANCED]
-        startDate:
-          type: string
-          format: date-time
-        endDate:
-          type: string
-          format: date-time
-        participants:
-          type: array
-          items:
-            $ref: '#/components/schemas/ServiceParticipant'
-
-    ServiceParticipant:
-      type: object
-      required: [participationId, userId, name, status, preparationIntent, desiredResults, lineManagerProfile, preparationCompletedAt]
-      properties:
-        participationId:
-          type: string
-          description: CourseParticipation.id
-        userId:
-          type: string
-          description: Clerk user ID
-        name:
-          type: string
-          nullable: true
-          description: User display name (from User.name via booking join)
-        status:
-          type: string
-          description: CourseParticipation status
-        preparationIntent:
-          type: string
-          nullable: true
-          maxLength: 2000
-          description: Participant's preparation intent
-        desiredResults:
-          type: string
-          nullable: true
-          maxLength: 2000
-          description: Participant's desired results
-        lineManagerProfile:
-          type: string
-          nullable: true
-          maxLength: 2000
-          description: Line manager profile
-        preparationCompletedAt:
-          type: string
-          format: date-time
-          nullable: true
-          description: When preparation was completed (null if not yet)

@@ -31,6 +31,8 @@ export const SessionIdSchema = z.string().regex(SESSION_ID_PATTERN, {
 
 export const RecordingSessionSchema = z.object({
 	sessionId: SessionIdSchema,
+	bookingId: z.string().min(1),
+	participantUserId: z.string().min(1),
 	filename: z.string().min(1),
 	status: RecordingStatus,
 	startedAt: z.string().datetime(),

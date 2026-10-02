@@ -11,6 +11,12 @@ import { loadConfig } from "@/lib/config";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import Mux from "@mux/mux-node";
 
+// Feature 012: stable playback reference & full-video JWT TTL helpers
+export {
+	buildStablePlaybackReference,
+	computeMuxTokenTtlSeconds,
+} from "./mux-uploader-signed";
+
 /** Create a MUX client using credentials from config */
 function createMuxClient(): Mux {
 	const config = loadConfig();
@@ -27,6 +33,11 @@ function createMuxClient(): Mux {
 export interface MuxUploadResult {
 	muxAssetId: string;
 	muxPlaybackUrl: string;
+}
+
+export interface MuxStagedIngestResult extends MuxUploadResult {
+	muxPlaybackId: string;
+	durationSeconds: number;
 }
 
 export interface MuxUploadOptions {
@@ -138,6 +149,63 @@ export async function uploadToMux(
 	return {
 		muxAssetId: assetId,
 		muxPlaybackUrl,
+	};
+}
+
+/** Creates a signed-playback asset from a short-lived private source URL. */
+export async function ingestStagedSourceToMux(
+	sourceUrl: string,
+	idempotencyKey: string,
+): Promise<MuxStagedIngestResult> {
+	const mux = createMuxClient();
+	let asset: Awaited<ReturnType<typeof mux.video.assets.create>>;
+	try {
+		asset = await mux.video.assets.create(
+			{
+				inputs: [{ url: sourceUrl }],
+				playback_policies: ["signed"],
+				passthrough: idempotencyKey,
+				video_quality: "basic",
+			},
+			{ idempotencyKey },
+		);
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		reportError(err instanceof Error ? err : new Error(message), undefined, "error");
+		throw new Error(`MUX_INGEST_FAILED: Failed to create staged asset — ${message}`);
+	}
+
+	const assetId = asset.id;
+	const deadline = Date.now() + 300_000;
+	while (Date.now() < deadline) {
+		try {
+			asset = await mux.video.assets.retrieve(assetId);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			throw new Error(`MUX_INGEST_FAILED: Failed to retrieve asset status — ${message}`);
+		}
+
+		if (asset.status === "ready") break;
+		if (asset.status === "errored") {
+			throw new Error("MUX_INGEST_FAILED: Asset processing failed");
+		}
+		await new Promise((resolve) => setTimeout(resolve, 3_000));
+	}
+
+	if (asset.status !== "ready") {
+		throw new Error("MUX_INGEST_FAILED: Asset did not become ready within timeout");
+	}
+
+	const playbackId = asset.playback_ids?.find((item) => item.policy === "signed")?.id;
+	if (!playbackId) {
+		throw new Error("MUX_INGEST_FAILED: No signed playback ID found on asset");
+	}
+
+	return {
+		muxAssetId: assetId,
+		muxPlaybackId: playbackId,
+		muxPlaybackUrl: `https://stream.mux.com/${playbackId}.m3u8`,
+		durationSeconds: asset.duration ?? 0,
 	};
 }
 

@@ -61,6 +61,73 @@ describe("writeFFMetadata", () => {
 
 		await expect(writeFFMetadata("rec_test", doc)).rejects.toThrow(BlobStorageError);
 	});
+
+	it("prefers BLOB_READ_WRITE_TIMESTAMP_TOKEN when both tokens are set", async () => {
+		const { put } = await import("@vercel/blob");
+		vi.mocked(put).mockResolvedValue({
+			url: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json",
+		} as Awaited<ReturnType<typeof put>>);
+		const { loadConfig } = await import("@/lib/config");
+		vi.mocked(loadConfig).mockReturnValueOnce({
+			BLOB_READ_WRITE_TOKEN: "generic-token",
+			BLOB_READ_WRITE_TIMESTAMP_TOKEN: "dedicated-token",
+		} as never);
+
+		const { writeFFMetadata } = await import("@/lib/recording/ffmetadata-blob");
+		const doc = {
+			metadata: { title: "rec_test", encoder: "aither-ffmetadata" as const },
+			chapters: [{ id: 0, start: 0, end: 0, title: "Chapter 1" }],
+		};
+
+		await writeFFMetadata("rec_test", doc);
+		expect(put).toHaveBeenCalledWith(
+			"ffmetadata/rec_test.json",
+			JSON.stringify(doc),
+			expect.objectContaining({ token: "dedicated-token" }),
+		);
+	});
+
+	it("falls back to BLOB_READ_WRITE_TOKEN when the dedicated token is unset", async () => {
+		const { put } = await import("@vercel/blob");
+		vi.mocked(put).mockResolvedValue({
+			url: "https://test.blob.vercel-storage.com/ffmetadata/rec_test.json",
+		} as Awaited<ReturnType<typeof put>>);
+		const { loadConfig } = await import("@/lib/config");
+		vi.mocked(loadConfig).mockReturnValueOnce({
+			BLOB_READ_WRITE_TOKEN: "generic-token",
+		} as never);
+
+		const { writeFFMetadata } = await import("@/lib/recording/ffmetadata-blob");
+		const doc = {
+			metadata: { title: "rec_test", encoder: "aither-ffmetadata" as const },
+			chapters: [{ id: 0, start: 0, end: 0, title: "Chapter 1" }],
+		};
+
+		await writeFFMetadata("rec_test", doc);
+		expect(put).toHaveBeenCalledWith(
+			"ffmetadata/rec_test.json",
+			JSON.stringify(doc),
+			expect.objectContaining({ token: "generic-token" }),
+		);
+	});
+
+	it("throws BlobStorageError when no blob token is configured", async () => {
+		const { loadConfig } = await import("@/lib/config");
+		vi.mocked(loadConfig).mockReturnValueOnce({
+			BLOB_READ_WRITE_TOKEN: undefined,
+			BLOB_READ_WRITE_TIMESTAMP_TOKEN: undefined,
+		} as never);
+
+		const { writeFFMetadata } = await import("@/lib/recording/ffmetadata-blob");
+		const doc = {
+			metadata: { title: "rec_test", encoder: "aither-ffmetadata" as const },
+			chapters: [{ id: 0, start: 0, end: 0, title: "Chapter 1" }],
+		};
+
+		await expect(writeFFMetadata("rec_test", doc)).rejects.toThrow(
+			"BLOB_READ_WRITE_TIMESTAMP_TOKEN (or BLOB_READ_WRITE_TOKEN) is not configured",
+		);
+	});
 });
 
 describe("readFFMetadata", () => {

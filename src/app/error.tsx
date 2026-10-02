@@ -1,6 +1,6 @@
 "use client";
 
-import { clientInstance } from "@/lib/monitoring/rollbar-official";
+import { clientInstance } from "@/lib/monitoring/rollbar-client";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";

@@ -3,6 +3,12 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import type { NextConfig } from "next";
 
+// NOTE: Keychain resolution is intentionally NOT called here.
+// resolveKeychainEnvironment() is invoked at server runtime in:
+//   - src/lib/config.ts (loadConfig)
+//   - src/lib/monitoring/rollbar-official.ts (server-side init)
+// Calling it here would expose secrets during build/config evaluation.
+
 const COMMIT_ENV_VARS = [
 	"NEXT_PUBLIC_GIT_COMMIT",
 	"VERCEL_GIT_COMMIT_SHA",

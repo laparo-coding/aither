@@ -9,6 +9,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { loadConfig } from "@/lib/config";
 import { reportError } from "@/lib/monitoring/rollbar-official";
+import type { BookingContext } from "@/lib/transcription/types";
 import {
 	type FFmpegProcess,
 	isFFmpegAvailable,
@@ -80,7 +81,7 @@ function clearTimers(): void {
  *   - "FFMPEG_NOT_FOUND:" if FFmpeg is not installed
  *   - "WEBCAM_UNREACHABLE:" if the stream fails to start
  */
-export async function startRecording(): Promise<RecordingSession> {
+export async function startRecording(booking: BookingContext): Promise<RecordingSession> {
 	// Mutex: reject concurrent session
 	if (
 		currentSession &&
@@ -123,6 +124,8 @@ export async function startRecording(): Promise<RecordingSession> {
 
 	currentSession = {
 		sessionId,
+		bookingId: booking.bookingId,
+		participantUserId: booking.participantUserId,
 		filename,
 		status: "starting",
 		startedAt: new Date().toISOString(),
@@ -199,6 +202,10 @@ export async function startRecording(): Promise<RecordingSession> {
  * @throws Error with "NOT_FOUND:" if no active session.
  */
 export async function stopRecording(): Promise<RecordingSession> {
+	if (currentSession?.status === "completed") {
+		return currentSession;
+	}
+
 	if (
 		!currentSession ||
 		(currentSession.status !== "recording" && currentSession.status !== "starting")

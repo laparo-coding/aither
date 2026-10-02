@@ -16,7 +16,7 @@ vi.mock("@vercel/blob", () => ({
 	del: (...args: unknown[]) => mockDel(...args),
 }));
 
-// Mock config to provide BLOB_READ_WRITE_TOKEN
+// Mock config to provide blob tokens
 vi.mock("@/lib/config", () => ({
 	loadConfig: vi.fn(() => ({
 		BLOB_READ_WRITE_TOKEN: "test-blob-token",
@@ -57,16 +57,56 @@ describe("chaptered-asset-mapping", () => {
 			expect(options.addRandomSuffix).toBe(false);
 		});
 
-		it("throws when BLOB_READ_WRITE_TOKEN is not configured", async () => {
+		it("throws when no blob token is configured", async () => {
 			const { loadConfig } = await import("@/lib/config");
-			vi.mocked(loadConfig).mockReturnValueOnce({ BLOB_READ_WRITE_TOKEN: undefined } as never);
+			vi.mocked(loadConfig).mockReturnValueOnce({
+				BLOB_READ_WRITE_TOKEN: undefined,
+				BLOB_READ_WRITE_TIMESTAMP_TOKEN: undefined,
+			} as never);
 
 			const { storeChapteredAssetMapping } = await import(
 				"@/lib/recording/chaptered-asset-mapping"
 			);
 			await expect(storeChapteredAssetMapping(VALID_MAPPING)).rejects.toThrow(
-				"BLOB_READ_WRITE_TOKEN is not configured",
+				"BLOB_READ_WRITE_TIMESTAMP_TOKEN (or BLOB_READ_WRITE_TOKEN) is not configured",
 			);
+		});
+
+		it("prefers BLOB_READ_WRITE_TIMESTAMP_TOKEN when both tokens are set", async () => {
+			mockPut.mockResolvedValue({
+				url: "https://blob.store/ffmetadata/rec_2025-01-15T10-30-00Z.chapters.json",
+			});
+			const { loadConfig } = await import("@/lib/config");
+			vi.mocked(loadConfig).mockReturnValueOnce({
+				BLOB_READ_WRITE_TOKEN: "generic-token",
+				BLOB_READ_WRITE_TIMESTAMP_TOKEN: "dedicated-token",
+			} as never);
+
+			const { storeChapteredAssetMapping } = await import(
+				"@/lib/recording/chaptered-asset-mapping"
+			);
+			await storeChapteredAssetMapping(VALID_MAPPING);
+
+			const [, , options] = mockPut.mock.calls[0];
+			expect(options.token).toBe("dedicated-token");
+		});
+
+		it("falls back to BLOB_READ_WRITE_TOKEN when the dedicated token is unset", async () => {
+			mockPut.mockResolvedValue({
+				url: "https://blob.store/ffmetadata/rec_2025-01-15T10-30-00Z.chapters.json",
+			});
+			const { loadConfig } = await import("@/lib/config");
+			vi.mocked(loadConfig).mockReturnValueOnce({
+				BLOB_READ_WRITE_TOKEN: "generic-token",
+			} as never);
+
+			const { storeChapteredAssetMapping } = await import(
+				"@/lib/recording/chaptered-asset-mapping"
+			);
+			await storeChapteredAssetMapping(VALID_MAPPING);
+
+			const [, , options] = mockPut.mock.calls[0];
+			expect(options.token).toBe("generic-token");
 		});
 	});
 

@@ -51,6 +51,7 @@ jobs:
             echo "Trivy scan complete: $(jq '[.runs[].results[]?] | length' /tmp/trivy-results.sarif) findings"
           fi
         env:
+          GH_TOKEN: ${{ github.token }}
           CODACY_API_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
 
   # CodeRabbit runs automatically on PRs via the GitHub App.

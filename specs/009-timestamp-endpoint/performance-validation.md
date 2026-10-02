@@ -18,7 +18,7 @@ real runtime with a configured Vercel Blob store.
 
 1. Ensure prerequisites:
    - Active recording session is present (`isRecording() === true`)
-   - `BLOB_READ_WRITE_TOKEN` is configured
+   - Blob token is configured (`BLOB_READ_WRITE_TIMESTAMP_TOKEN` or legacy `BLOB_READ_WRITE_TOKEN`)
    - Blob document warmed with at least 50 existing chapters
 2. Send 30 sequential `POST /api/recording/timestamp` requests with valid auth.
 3. Discard sample #1 as warm-up.

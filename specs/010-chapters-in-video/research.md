@@ -127,7 +127,7 @@ const asset = await mux.video.assets.retrieve(muxAssetId!);
 **Environment Variables**:
 - `MUX_TOKEN_ID` — MUX API token ID (server-side only, never exposed to client).
 - `MUX_TOKEN_SECRET` — MUX API token secret (server-side only).
-- `BLOB_READ_WRITE_TOKEN` — Vercel Blob token (for the `assetId → muxAssetId` mapping, same store as Spec 009).
+- `BLOB_READ_WRITE_TIMESTAMP_TOKEN` — Vercel Blob token (for the `assetId → muxAssetId` mapping, same store as Spec 009; legacy fallback `BLOB_READ_WRITE_TOKEN`).
 
 ### Rationale
 

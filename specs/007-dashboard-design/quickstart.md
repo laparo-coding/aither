@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- Node.js 20+ and npm
+- Node.js 20.19+ and npm
 - Aither repo checked out on `007-dashboard-design` branch
 - Hemera API running on port 3000 (for course data)
 - Environment: `HEMERA_API_BASE_URL=http://localhost:3000`

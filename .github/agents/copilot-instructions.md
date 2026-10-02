@@ -3,6 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2026-02-11
 
 ## Active Technologies
+
 - TypeScript 5.9+ on Node.js (Next.js 16+ App Router) + Next.js 16, Clerk auth, Zod, Rollbar (all existing); FFmpeg (system binary) (004-video-recorder)
 - Local filesystem (`output/recordings/`), gitignored. In-memory session state (no database). (004-video-recorder)
 - TypeScript 5.9.3 + Next.js 16.1.6, React 19.2.4, Zod 3.24, Handlebars 4.7.8, p-throttle 6.2, p-retry 6.2, MUI 6.4 (005-data-sync)
@@ -17,6 +18,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-11
 - Local `/output/recordings/` (raw + chaptered MP4), Vercel Blob Storage (ffmetadata JSON read-only), in-memory SSE registry for chapter-boundary events (010-chapters-in-video)
 - TypeScript 5.9, Next.js 16 App Router + ffmpeg, ffprobe (CLI spawning), @mux/mux-node (MUX upload + asset management), @vercel/blob (Vercel Blob Storage), zod (schema validation) (010-chapters-in-video)
 - MUX (chaptered asset — canonical video store per Constitution Principle VIII); transient local `/output/recordings/` file only during remux + upload, deleted after successful MUX upload. Vercel Blob Storage (ffmetadata JSON read-only), in-memory SSE registry for chapter-boundary events (010-chapters-in-video)
+- TypeScript 5.9, Node.js 20.19+, Next.js 16 App Router, React 19 + `@mux/mux-node`, `@vercel/blob` 2.6+, Zod, Hemera API client, Rollbar; AssemblyAI JavaScript SDK `assemblyai`; `tsx` for dev worker only (production runs compiled JS via `node`); Vitest and Playwright (012-video-transcription)
+- Hemera Prisma database for workflow/review/deletion metadata; MUX for signed-policy video assets; private Vercel Blob for role-separated transcript; temporary Aither recording filesystem; no Aither database (012-video-transcription)
 
 - TypeScript 5.9.3, Node.js (Next.js 16.1.6 with App Router, React 19.2.4) + Zod (validation), Clerk (auth/RBAC), MUI (dashboard UI), Rollbar (error monitoring), Nodemailer (SMTP email notifications) (001-hemera-api-integration)
 
@@ -36,9 +39,10 @@ npm test && npm run lint
 TypeScript 5.9.3, Node.js (Next.js 16.1.6 with App Router, React 19.2.4): Follow standard conventions
 
 ## Recent Changes
-- 010-chapters-in-video: Added TypeScript 5.9, Next.js 16 App Router + ffmpeg, ffprobe (CLI spawning), @mux/mux-node (MUX upload + asset management), @vercel/blob (Vercel Blob Storage), zod (schema validation)
-- 009-timestamp-endpoint: Added TypeScript 5.9, Next.js 16 App Router (server route handlers) + Next.js route handlers, `@vercel/blob` (NEW), Zod, existing recording `session-manager`, `timingSafeEqualString`, Vitest
 
+- Clerk migration: Replaced deprecated `@clerk/clerk-react` with `@clerk/react`, added explicit Clerk packages
+- Security: Updated nodemailer to 10.0.9 (fixed 3 vulnerabilities: GHSA-prgh-xp8r-p3m5, GHSA-v53p-9fqp-m79j, GHSA-g57g-f23g-4646)
+- Node version alignment: All docs now require Node.js >= 20.19.0 (matching transitive deps)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

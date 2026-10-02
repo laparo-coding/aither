@@ -1,0 +1,464 @@
+openapi: 3.1.0
+info:
+  title: Aither-Hemera Seminar Recording Integration
+  version: 1.0.0
+  description: >-
+    Service contracts for validated booking lookup, durable transcription workflow
+    state, and authorized short-lived media access. Hemera owns workflow records
+    and booking authorization; Aither owns AssemblyAI, MUX, and Blob credentials.
+servers:
+  - url: https://aither.example.invalid
+    description: Aither service (placeholder)
+  - url: https://hemera.example.invalid
+    description: Hemera service (placeholder)
+tags:
+  - name: Hemera Service API
+  - name: Aither Service API
+  - name: AssemblyAI Callback
+paths:
+  /api/service/bookings/{bookingId}:
+    get:
+      tags: [Hemera Service API]
+      summary: Resolve a booking before recording
+      security:
+        - HemeraApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Booking and server-derived participant identity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingContext'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/service/bookings/{bookingId}/seminar-recordings/{recordingId}:
+    get:
+      tags: [Hemera Service API]
+      summary: Read the canonical workflow state for retry/reconciliation
+      security:
+        - HemeraApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+        - $ref: '#/components/parameters/RecordingId'
+      responses:
+        '200':
+          description: Canonical workflow record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeminarRecordingWorkflow'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Hemera Service API]
+      summary: Idempotently create or advance a recording workflow
+      security:
+        - HemeraApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/BookingId'
+        - $ref: '#/components/parameters/RecordingId'
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowUpdate'
+      responses:
+        '200':
+          description: Created or updated workflow record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeminarRecordingWorkflow'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Booking/participant mismatch or invalid state transition
+  /api/service/seminar-recording-jobs:
+    get:
+      tags: [Hemera Service API]
+      summary: List queued or resumable workflows for the Aither worker
+      security:
+        - HemeraApiKey: []
+      parameters:
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/WorkflowStatus'
+          style: form
+          explode: false
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Workflows ordered by creation time, oldest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SeminarRecordingWorkflow'
+  /api/service/seminar-document-access:
+    post:
+      tags: [Aither Service API]
+      summary: Mint short-lived media access after Hemera booking authorization
+      description: >-
+        Called only by Hemera server-side after checking the authenticated user's
+        ownership of bookingId. This endpoint is not a substitute for Hemera's
+        user authorization check.
+      security:
+        - AitherServiceKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookingId, recordingId]
+              properties:
+                bookingId:
+                  type: string
+                recordingId:
+                  type: string
+      responses:
+        '200':
+          description: Temporary bearer URLs for a ready workflow
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [muxPlaybackUrl, transcriptUrl, muxExpiresAt, transcriptExpiresAt]
+                properties:
+                  muxPlaybackUrl:
+                    type: string
+                    format: uri
+                    description: Fresh signed HLS URL; expiry exceeds the full video duration. This request-time URL is distinct from the stable muxPlaybackUrl stored in Hemera and must not be persisted or logged.
+                  transcriptUrl:
+                    type: string
+                    format: uri
+                    description: Private Blob GET URL expiring after exactly 300 seconds.
+                  muxExpiresAt:
+                    type: string
+                    format: date-time
+                  transcriptExpiresAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Workflow is not ready for participant access
+  /api/recording/transcription/{recordingId}/review:
+    put:
+      tags: [Aither Service API]
+      summary: Approve a corrected speaker-role mapping
+      description: >-
+        Requires an authenticated Aither administrator. The workflow remains
+        unavailable to Hemera participants until this correction is validated
+        and the publish stages complete.
+      security:
+        - ClerkSessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/RecordingId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookingId, participantSpeakerId, leaderSpeakerId, approve]
+              properties:
+                bookingId:
+                  type: string
+                participantSpeakerId:
+                  type: string
+                leaderSpeakerId:
+                  type: string
+                approve:
+                  type: boolean
+                  const: true
+      responses:
+        '200':
+          description: Mapping accepted; workflow resumed for publication
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: User is not authorized to review transcription
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Workflow is not awaiting speaker review
+        '422':
+          description: Mapping is invalid or maps both roles to the same speaker
+  /api/service/seminar-recordings/{recordingId}:
+    delete:
+      tags: [Aither Service API]
+      summary: Revoke and delete all provider artifacts after Hemera booking/participation deletion
+      description: >-
+        Hemera revokes participant access before calling this endpoint. Aither
+        deletes any AssemblyAI transcript/source media, MUX asset, final and
+        source-staging private Blob objects, and any residual local recording
+        artifact, then reports completion so Hemera
+        can purge its non-visible tombstone.
+      security:
+        - AitherServiceKey: []
+      parameters:
+        - $ref: '#/components/parameters/RecordingId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookingId, deletionId]
+              properties:
+                bookingId:
+                  type: string
+                deletionId:
+                  type: string
+                  description: Hemera-generated idempotency key for this delete operation.
+                deletionReason:
+                  type: string
+                  enum: [booking_deleted, participation_deleted, operator_abandoned]
+                  description: Operator abandonment may be requested only by an authorized Hemera administrator.
+      responses:
+        '202':
+          description: Access revoked; asset deletion accepted or already in progress
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '200':
+          description: Every known provider artifact is deleted or idempotently confirmed as already deleted; safe to purge the Hemera tombstone.
+  /api/assemblyai/webhook:
+    post:
+      tags: [AssemblyAI Callback]
+      summary: Receive an authenticated AssemblyAI transcription completion callback
+      security:
+        - AssemblyAIWebhookSecret: []
+      parameters:
+        - name: recordingId
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transcript_id, status]
+              properties:
+                transcript_id:
+                  type: string
+                status:
+                  type: string
+                  enum: [completed, error]
+      responses:
+        '202':
+          description: Callback accepted for idempotent canonical-workflow processing; duplicate or stale delivery does not overwrite an approved mapping or completed stage.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Hemera unavailable; callback should be retried
+components:
+  securitySchemes:
+    HemeraApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    AitherServiceKey:
+      type: apiKey
+      in: header
+      name: X-Aither-Service-Key
+    AssemblyAIWebhookSecret:
+      type: apiKey
+      in: header
+      name: X-AssemblyAI-Webhook-Secret
+    ClerkSessionCookie:
+      type: apiKey
+      in: cookie
+      name: __session
+  parameters:
+    BookingId:
+      name: bookingId
+      in: path
+      required: true
+      schema:
+        type: string
+    RecordingId:
+      name: recordingId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    BookingContext:
+      type: object
+      required: [bookingId, participantUserId, courseId]
+      properties:
+        bookingId:
+          type: string
+        participantUserId:
+          type: string
+          description: Hemera identity resolved from the booking, not from caller input.
+        courseId:
+          type: string
+    WorkflowStatus:
+      type: string
+      enum:
+        - queued
+        - transcribing
+        - transcript_ready
+        - review_required
+        - publishing
+        - ready
+        - retryable_failure
+        - failed
+        - deletion_pending
+        - deleted
+    WorkflowUpdate:
+      type: object
+      required: [status, recordingDate]
+      properties:
+        status:
+          $ref: '#/components/schemas/WorkflowStatus'
+        recordingDate:
+          type: string
+          format: date-time
+        queuedAt:
+          type: string
+          format: date-time
+          description: Timestamp when Hemera persisted the queued workflow; used to measure first-provider-call latency.
+        firstProviderAttemptAt:
+          type: [string, 'null']
+          format: date-time
+          description: First actual provider call timestamp; no call is counted while that provider circuit is open.
+        assemblyAiTranscriptId:
+          type: [string, 'null']
+        assemblyAiStatus:
+          type: [string, 'null']
+        sourceBlobPathname:
+          type: [string, 'null']
+          description: Private temporary source-staging pathname; never a signed URL.
+        muxAssetId:
+          type: [string, 'null']
+        muxPlaybackId:
+          type: [string, 'null']
+        muxPlaybackUrl:
+          type: [string, 'null']
+          format: uri
+          description: Stable MUX playback URL/reference sent directly from Aither to Hemera after upload. It contains no signed playback token; participants receive a fresh signed URL after booking authorization.
+        durationSeconds:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+          description: MUX-reported video duration used to mint playback tokens that last through the full recording.
+        transcriptBlobPathname:
+          type: [string, 'null']
+        lastErrorCode:
+          type: [string, 'null']
+        stageAttemptCounts:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+            maximum: 5
+        nextAttemptAt:
+          type: [string, 'null']
+          format: date-time
+          description: Earliest time the worker may retry the current failed stage.
+        assemblyAiCleanupStatus:
+          type: string
+          enum: [pending, complete, retryable_failure, not_required]
+        sourceBlobCleanupStatus:
+          type: string
+          enum: [pending, complete, retryable_failure, not_required]
+        reviewedSpeakerMapping:
+          type: [object, 'null']
+          additionalProperties:
+            type: string
+        reviewedBy:
+          type: [string, 'null']
+        reviewedAt:
+          type: [string, 'null']
+          format: date-time
+        deletionRequestedAt:
+          type: [string, 'null']
+          format: date-time
+        deletionConfirmedAt:
+          type: [string, 'null']
+          format: date-time
+          description: >-
+            Set by Aither through this PUT after every known provider artifact is
+            deleted or idempotently confirmed as already deleted. Hemera purges the
+            tombstone, workflow, and trace immediately after receiving it.
+        traceEvents:
+          type: array
+          description: Minimal workflow trace. Entries exclude transcript text, raw provider payloads, signed URLs, tokens, and secrets.
+          items:
+            type: object
+            required: [eventType, occurredAt]
+            properties:
+              eventType:
+                type: string
+              fromStatus:
+                type: [string, 'null']
+              toStatus:
+                type: [string, 'null']
+              providerReference:
+                type: [string, 'null']
+              errorCode:
+                type: [string, 'null']
+              operatorId:
+                type: [string, 'null']
+              occurredAt:
+                type: string
+                format: date-time
+    SeminarRecordingWorkflow:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowUpdate'
+        - type: object
+          required: [bookingId, participantUserId, recordingId]
+          properties:
+            bookingId:
+              type: string
+            participantUserId:
+              type: string
+            recordingId:
+              type: string
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+  responses:
+    Unauthorized:
+      description: Missing or invalid service credential
+    NotFound:
+      description: Booking or recording workflow not found

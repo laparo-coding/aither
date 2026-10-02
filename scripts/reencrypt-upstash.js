@@ -36,37 +36,36 @@ function parseArgs() {
 		swap: false,
 		force: false,
 	};
-	for (let i = 0; i < args.length; i++) {
-		const a = args[i];
-		if (a === "--keys") {
-			if (i + 1 >= args.length) {
-				console.error("--keys requires a value");
-				process.exit(2);
-			}
-			out.keys = args[++i]
+	const valueHandlers = {
+		"--keys": (value) => {
+			out.keys = value
 				.split(",")
 				.map((s) => s.trim())
 				.filter(Boolean);
-		} else if (a === "--old-key") {
+		},
+		"--old-key": (value) => {
+			out.oldKey = value;
+		},
+		"--new-key": (value) => {
+			out.newKey = value;
+		},
+	};
+	const booleanFlags = {
+		"--dry-run": "dryRun",
+		"--idempotent": "idempotent",
+		"--swap": "swap",
+		"--force": "force",
+	};
+	for (let i = 0; i < args.length; i++) {
+		const a = args[i];
+		if (a in valueHandlers) {
 			if (i + 1 >= args.length) {
-				console.error("--old-key requires a value");
+				console.error(`${a} requires a value`);
 				process.exit(2);
 			}
-			out.oldKey = args[++i];
-		} else if (a === "--new-key") {
-			if (i + 1 >= args.length) {
-				console.error("--new-key requires a value");
-				process.exit(2);
-			}
-			out.newKey = args[++i];
-		} else if (a === "--dry-run") {
-			out.dryRun = true;
-		} else if (a === "--idempotent") {
-			out.idempotent = true;
-		} else if (a === "--swap") {
-			out.swap = true;
-		} else if (a === "--force") {
-			out.force = true;
+			valueHandlers[a](args[++i]);
+		} else if (a in booleanFlags) {
+			out[booleanFlags[a]] = true;
 		} else {
 			console.error("Unknown arg", a);
 			process.exit(2);
@@ -120,6 +119,119 @@ function decryptWithKey(maybeEncrypted, keyBuf) {
 	return plain.toString("utf8");
 }
 
+function normalizeValue(raw) {
+	if (typeof raw === "string") return raw;
+	// Objects/arrays: serialize to JSON; primitives: coerce to string
+	return typeof raw === "object" && raw !== null ? JSON.stringify(raw) : String(raw);
+}
+
+function resolvePlaintext(key, value, oldKeyBuf) {
+	if (!value.startsWith("enc:")) return value;
+	if (!oldKeyBuf) {
+		throw new Error(`Key ${key} is encrypted but no old key provided`);
+	}
+	return decryptWithKey(value, oldKeyBuf);
+}
+
+async function getTtlSeconds(redis, key) {
+	if (typeof redis.ttl !== "function") return null;
+	try {
+		const t = await redis.ttl(key);
+		if (typeof t === "number" && t > 0) return t;
+	} catch (_e) {
+		// ignore TTL errors — treat as no TTL
+	}
+	return null;
+}
+
+async function targetExists(redis, targetKey) {
+	try {
+		return (await redis.get(targetKey)) != null;
+	} catch (_e) {
+		return false;
+	}
+}
+
+async function reencryptKey(redis, key, opts, oldKeyBuf, newKeyBuf, summary) {
+	try {
+		const raw = await redis.get(key);
+		if (raw == null) {
+			console.log(`Key ${key}: not found`);
+			summary.skipped.push(key);
+			return;
+		}
+
+		const value = normalizeValue(raw);
+		const plain = resolvePlaintext(key, value, oldKeyBuf);
+		const newEnc = encryptWithKey(plain, newKeyBuf);
+		const targetKey = opts.idempotent ? `${key}.reenc` : key;
+
+		if (opts.dryRun) {
+			console.log(`Key ${key}: would write encrypted value to ${targetKey} (len ${newEnc.length})`);
+			summary.updated.push(key);
+			return;
+		}
+
+		// when idempotent and target exists, avoid overwriting unless --force
+		if (opts.idempotent && !opts.force && (await targetExists(redis, targetKey))) {
+			console.log(`Target ${targetKey} already exists; skipping (use --force to overwrite)`);
+			summary.skipped.push(key);
+			return;
+		}
+
+		// try to preserve TTL if supported
+		const ttlSeconds = await getTtlSeconds(redis, key);
+		if (ttlSeconds != null) {
+			await redis.set(targetKey, newEnc, { ex: ttlSeconds });
+		} else {
+			await redis.set(targetKey, newEnc);
+		}
+
+		console.log(`Key ${key}: re-encrypted -> ${targetKey}`);
+		summary.updated.push(key);
+	} catch (err) {
+		console.error(`Key ${key}: error:`, err.message || err);
+		summary.errors.push({ key, err: String(err) });
+	}
+}
+
+async function swapKeys(redis, opts) {
+	console.log("Swap requested: replacing originals from .reenc keys");
+	const swapSummary = { swapped: [], skipped: [], errors: [] };
+	for (const k of opts.keys) {
+		const targetKey = `${k}.reenc`;
+		try {
+			const value = await redis.get(targetKey);
+			if (value == null) {
+				console.log(`Swap ${k}: ${targetKey} not found; skipping`);
+				swapSummary.skipped.push(k);
+				continue;
+			}
+
+			if (opts.dryRun) {
+				console.log(`Swap ${k}: would copy ${targetKey} -> ${k} and delete ${targetKey}`);
+				swapSummary.swapped.push(k);
+				continue;
+			}
+
+			// try to preserve TTL from the reenc key
+			const ttlSeconds = await getTtlSeconds(redis, targetKey);
+			if (ttlSeconds != null) {
+				await redis.set(k, value, { ex: ttlSeconds });
+			} else {
+				await redis.set(k, value);
+			}
+			await redis.del(targetKey).catch(() => {});
+			console.log(`Swap ${k}: replaced from ${targetKey}`);
+			swapSummary.swapped.push(k);
+		} catch (err) {
+			console.error(`Swap ${k}: error:`, err.message || err);
+			swapSummary.errors.push({ key: k, err: String(err) });
+		}
+	}
+	console.log("Swap summary:", swapSummary);
+}
+
 async function main() {
 	const opts = parseArgs();
 	if (!opts.keys.length) {
@@ -153,130 +265,13 @@ async function main() {
 
 	const summary = { updated: [], skipped: [], errors: [] };
 
-	const reencWritten = [];
 	for (const key of opts.keys) {
-		try {
-			const raw = await redis.get(key);
-			if (raw == null) {
-				console.log(`Key ${key}: not found`);
-				summary.skipped.push(key);
-				continue;
-			}
-
-			let value = raw;
-			if (typeof value !== "string") {
-				// Objects/arrays: serialize to JSON; primitives: coerce to string
-				value = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
-			}
-
-			let plain;
-			if (value.startsWith("enc:")) {
-				if (!oldKeyBuf) {
-					throw new Error(`Key ${key} is encrypted but no old key provided`);
-				}
-				plain = decryptWithKey(value, oldKeyBuf);
-			} else {
-				plain = value;
-			}
-
-			const newEnc = encryptWithKey(plain, newKeyBuf);
-
-			const targetKey = opts.idempotent ? `${key}.reenc` : key;
-
-			if (opts.dryRun) {
-				console.log(
-					`Key ${key}: would write encrypted value to ${targetKey} (len ${newEnc.length})`,
-				);
-				summary.updated.push(key);
-				if (opts.idempotent) reencWritten.push({ key, targetKey });
-				continue;
-			}
-
-			// try to preserve TTL if supported
-			let ttlSeconds = null;
-			if (typeof redis.ttl === "function") {
-				try {
-					const t = await redis.ttl(key);
-					if (typeof t === "number" && t > 0) ttlSeconds = t;
-				} catch (_e) {
-					// ignore
-				}
-			}
-
-			// when idempotent and target exists, avoid overwriting unless --force
-			if (opts.idempotent && !opts.force) {
-				try {
-					const existing = await redis.get(targetKey);
-					if (existing != null) {
-						console.log(`Target ${targetKey} already exists; skipping (use --force to overwrite)`);
-						summary.skipped.push(key);
-						continue;
-					}
-				} catch (_e) {
-					// ignore
-				}
-			}
-
-			if (ttlSeconds != null) {
-				await redis.set(targetKey, newEnc, { ex: ttlSeconds });
-			} else {
-				await redis.set(targetKey, newEnc);
-			}
-
-			console.log(`Key ${key}: re-encrypted -> ${targetKey}`);
-			summary.updated.push(key);
-			if (opts.idempotent) reencWritten.push({ key, targetKey });
-		} catch (err) {
-			console.error(`Key ${key}: error:`, err.message || err);
-			summary.errors.push({ key, err: String(err) });
-		}
+		await reencryptKey(redis, key, opts, oldKeyBuf, newKeyBuf, summary);
 	}
 
 	// If requested, perform swap of .reenc keys into originals
 	if (opts.swap) {
-		console.log("Swap requested: replacing originals from .reenc keys");
-		const swapSummary = { swapped: [], skipped: [], errors: [] };
-		for (const k of opts.keys) {
-			const targetKey = `${k}.reenc`;
-			try {
-				const exists = await redis.get(targetKey);
-				if (exists == null) {
-					console.log(`Swap ${k}: ${targetKey} not found; skipping`);
-					swapSummary.skipped.push(k);
-					continue;
-				}
-
-				if (opts.dryRun) {
-					console.log(`Swap ${k}: would copy ${targetKey} -> ${k} and delete ${targetKey}`);
-					swapSummary.swapped.push(k);
-					continue;
-				}
-
-				// try to preserve TTL from the reenc key
-				let ttlSeconds = null;
-				if (typeof redis.ttl === "function") {
-					try {
-						const t = await redis.ttl(targetKey);
-						if (typeof t === "number" && t > 0) ttlSeconds = t;
-					} catch (_e) {
-						// ignore
-					}
-				}
-
-				if (ttlSeconds != null) {
-					await redis.set(k, exists, { ex: ttlSeconds });
-				} else {
-					await redis.set(k, exists);
-				}
-				await redis.del(targetKey).catch(() => {});
-				console.log(`Swap ${k}: replaced from ${targetKey}`);
-				swapSummary.swapped.push(k);
-			} catch (err) {
-				console.error(`Swap ${k}: error:`, err.message || err);
-				swapSummary.errors.push({ key: k, err: String(err) });
-			}
-		}
-		console.log("Swap summary:", swapSummary);
+		await swapKeys(redis, opts);
 	}
 
 	console.log("Done. Summary:", summary);
