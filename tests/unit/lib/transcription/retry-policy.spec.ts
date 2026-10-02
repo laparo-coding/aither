@@ -25,19 +25,18 @@ describe("per-stage attempt cap", () => {
 
 describe("backoff computation", () => {
 	it("uses exponential backoff with jitter for transient failures", () => {
-		vi.spyOn(Math, "random").mockReturnValue(0.5);
 		const base = 1000;
-		expect(computeBackoffDelay(1, base)).toBe(1500);
-		expect(computeBackoffDelay(2, base)).toBe(3000);
-		expect(computeBackoffDelay(3, base)).toBe(6000);
-		vi.restoreAllMocks();
+		expect(computeBackoffDelay(1, base)).toBeGreaterThanOrEqual(base);
+		expect(computeBackoffDelay(1, base)).toBeLessThanOrEqual(base * 2);
+		expect(computeBackoffDelay(2, base)).toBeGreaterThanOrEqual(base * 2);
+		expect(computeBackoffDelay(2, base)).toBeLessThanOrEqual(base * 4);
+		expect(computeBackoffDelay(3, base)).toBeGreaterThanOrEqual(base * 4);
+		expect(computeBackoffDelay(3, base)).toBeLessThanOrEqual(base * 8);
 	});
 
 	it("honors a provider Retry-After header over the computed delay", () => {
-		vi.spyOn(Math, "random").mockReturnValue(0);
 		const retryAfterMs = 10_000;
 		expect(computeBackoffDelay(1, 1000, retryAfterMs)).toBe(10_000);
-		vi.restoreAllMocks();
 	});
 
 	it("keeps a circuit open until the provider Retry-After delay expires", () => {

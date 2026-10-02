@@ -5,6 +5,8 @@
 // escalation, and provider-specific circuit breakers (FR-018/FR-022).
 // ---------------------------------------------------------------------------
 
+import { randomInt } from "node:crypto";
+
 /** Maximum total provider calls per workflow stage, including the initial call. */
 export const MAX_STAGE_ATTEMPTS = 5;
 
@@ -27,7 +29,7 @@ export function computeBackoffDelay(
 	}
 	const exponential = baseDelayMs * 2 ** (attempt - 1);
 	// Jitter between 100% and 200% of the exponential delay
-	return Math.round(exponential * (1 + Math.random()));
+	return Math.round(exponential * (1 + randomInt(0, 1001) / 1000));
 }
 
 /**
