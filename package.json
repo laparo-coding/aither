@@ -16,15 +16,18 @@
 		"test:watch": "vitest",
 		"coverage:gate": "bash scripts/coverage-gate.sh",
 		"rollbar:keychain": "bash scripts/rollbar-keychain-setup.sh",
+		"build:worker": "tsx scripts/build-worker.ts",
+		"transcription:worker": "node dist/scripts/transcription-worker.js",
+		"transcription:worker:dev": "tsx scripts/transcription-worker.ts",
 		"typecheck": "tsc --noEmit",
 		"open:code": "code .",
 		"prepare": "husky install"
 	},
 	"engines": {
-		"node": ">=20.11.0"
+		"node": ">=20.19.0"
 	},
 	"dependencies": {
-		"@clerk/nextjs": "^6.39.3",
+		"@clerk/nextjs": "^7.9.10",
 		"@emotion/cache": "^11.14.0",
 		"@emotion/react": "^11.14.0",
 		"@emotion/styled": "^11.14.0",
@@ -34,15 +37,16 @@
 		"@upstash/context7-sdk": "^0.3.0",
 		"@upstash/redis": "^1.36.2",
 		"@vercel/blob": "^2.6.1",
+		"assemblyai": "^4.41.5",
 		"handlebars": "^4.7.9",
 		"next": "^16.2.11",
-		"nodemailer": "^9.0.1",
+		"nodemailer": "^10.0.13",
 		"p-retry": "^6.2.1",
 		"p-throttle": "^6.2.0",
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4",
 		"rollbar": "^2.26.5",
-		"sharp": "^0.35.0",
+		"sharp": "^0.35.4",
 		"uuid": "^11.1.1",
 		"zod": "^3.24.0"
 	},
@@ -60,9 +64,11 @@
 		"@types/react-dom": "^19.0.0",
 		"@types/uuid": "^10.0.0",
 		"@vitest/coverage-v8": "^3.0.0",
+		"baseline-browser-mapping": "^2.11.0",
 		"cspell": "^9.6.4",
 		"husky": "^9.1.7",
 		"jsdom": "^29.0.1",
+		"tsx": "^4.23.15",
 		"typescript": "^5.9.3",
 		"vite-tsconfig-paths": "^6.1.0",
 		"vitest": "^3.0.0"
@@ -70,7 +76,7 @@
 	"overrides": {
 		"form-data": "^4.0.6",
 		"postcss": "^8.5.18",
-		"sharp": "^0.35.0",
+		"sharp": "^0.35.4",
 		"yaml": "^2.8.3"
 	}
 }

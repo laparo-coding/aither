@@ -72,9 +72,14 @@ function withTimeoutForWrite<T>(promise: Promise<T>, ms: number, label: string):
 
 function getToken(): string {
 	const config = loadConfig();
-	const token = config.BLOB_READ_WRITE_TOKEN;
+	// Preferred dedicated Spec-009 token; fall back to the generic token so
+	// existing deployments configured with only BLOB_READ_WRITE_TOKEN keep working.
+	// `||` (not `??`): an empty dedicated token also falls back.
+	const token = config.BLOB_READ_WRITE_TIMESTAMP_TOKEN || config.BLOB_READ_WRITE_TOKEN;
 	if (!token) {
-		throw new BlobStorageError("BLOB_READ_WRITE_TOKEN is not configured");
+		throw new BlobStorageError(
+			"BLOB_READ_WRITE_TIMESTAMP_TOKEN (or BLOB_READ_WRITE_TOKEN) is not configured",
+		);
 	}
 	return token;
 }

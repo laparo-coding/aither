@@ -65,7 +65,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
-          description: Vercel Blob Storage write failed or BLOB_READ_WRITE_TOKEN missing.
+          description: Vercel Blob Storage write failed or blob token missing (BLOB_READ_WRITE_TIMESTAMP_TOKEN or legacy BLOB_READ_WRITE_TOKEN).
           content:
             application/json:
               schema:

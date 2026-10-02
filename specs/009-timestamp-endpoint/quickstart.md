@@ -44,15 +44,17 @@ Add to Aither `.env.local` (dev) and the Linux host `.env` (prod). Never commit.
 
 ```bash
 # Vercel Blob (dedicated Aither store)
-BLOB_READ_WRITE_TOKEN="vercel_blob_rw_XXXXXXXXXXXX"
+BLOB_READ_WRITE_TIMESTAMP_TOKEN="vercel_blob_rw_XXXXXXXXXXXX"
+# Legacy fallback (still supported): BLOB_READ_WRITE_TOKEN
 
 # Uranos service token (shared secret with the Uranos app)
 URANOS_SYNC_TOKEN="<generated-48-byte-base64url-secret>"
 ```
 
 Both are surfaced through `src/lib/config.ts`:
-- `BLOB_READ_WRITE_TOKEN` — optional at boot, required at request time
-  (missing → `503 BLOB_STORAGE_UNAVAILABLE`).
+- `BLOB_READ_WRITE_TIMESTAMP_TOKEN` — optional at boot, required at request time
+  (missing → `503 BLOB_STORAGE_UNAVAILABLE`). Falls back to `BLOB_READ_WRITE_TOKEN`
+  when unset (backward compatibility).
 - `URANOS_SYNC_TOKEN` — required for token-based auth (admin session is the
   only fallback).
 
@@ -158,7 +160,7 @@ npm run test:contract -- timestamp
 ## Validation Checklist
 
 - [ ] `@vercel/blob` installed; Trivy scan clean.
-- [ ] Dedicated Aither `BLOB_READ_WRITE_TOKEN` set (not Hemera's).
+- [ ] Dedicated Aither blob token set (`BLOB_READ_WRITE_TIMESTAMP_TOKEN`, not Hemera's).
 - [ ] `URANOS_SYNC_TOKEN` set in Aither and Uranos.
 - [ ] 404 when no recording is active (no blob write).
 - [ ] 401 without token; 200 with token + active recording.

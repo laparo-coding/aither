@@ -33,7 +33,7 @@ consistent, and measurable — NOT whether the implementation works.
 - [X] CHK012 Are authentication requirements defined for every entry path (service token, admin session, anonymous)? [Coverage, Spec §FR-003]
 - [X] CHK013 Is the outcome for each auth case specified (token→200, no-token→401, non-admin session→403, admin→200)? [Completeness, Spec §FR-003, §Error Code Matrix]
 - [X] CHK014 Is a requirement present that tokens are compared in constant time (timing-safe)? [Completeness, Spec §Service User, research §R6]
-- [X] CHK015 Are secret-leakage prohibitions specified for responses AND logs (bearer, `URANOS_SYNC_TOKEN`, `BLOB_READ_WRITE_TOKEN`, filesystem paths)? [Completeness, Spec §FR-017, §SC-006]
+- [X] CHK015 Are secret-leakage prohibitions specified for responses AND logs (bearer, `URANOS_SYNC_TOKEN`, blob tokens (`BLOB_READ_WRITE_TIMESTAMP_TOKEN`/`BLOB_READ_WRITE_TOKEN`), filesystem paths)? [Completeness, Spec §FR-017, §SC-006]
 - [X] CHK016 Is the rate-limit policy fully specified (limit, window, response code, key for both token and admin-session callers)? [Completeness, Spec §FR-019]
 - [X] CHK017 Are requirements defined for the missing-credential configuration case (e.g., `URANOS_SYNC_TOKEN` unset)? [Resolved, Spec §FR-018a]
 

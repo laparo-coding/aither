@@ -32,7 +32,8 @@ Ensure the following are set in `.env` (or your environment):
 
 ```bash
 # Vercel Blob Storage (for ffmetadata JSON read)
-BLOB_READ_WRITE_TOKEN=vercel_blob_rw_xxxxxxxxxxxxx
+BLOB_READ_WRITE_TIMESTAMP_TOKEN=vercel_blob_rw_xxxxxxxxxxxxx
+# Legacy fallback (still supported): BLOB_READ_WRITE_TOKEN
 
 # MUX credentials (required for chaptered MP4 upload)
 MUX_TOKEN_ID=your_mux_token_id
