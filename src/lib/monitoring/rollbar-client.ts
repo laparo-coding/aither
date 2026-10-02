@@ -47,6 +47,18 @@ const isTestMode =
 const isExplicitlyDisabled = process.env.NEXT_PUBLIC_ROLLBAR_ENABLED === "0";
 const clientRollbarToken = process.env.NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN;
 
+/**
+ * Evaluate NEXT_PUBLIC_ROLLBAR_ENABLED with the same semantics as the server
+ * schema in src/lib/config.ts (envBool(true)): "1"/"true" enable, "0"/"false"
+ * disable, and a missing flag defaults to enabled. Cannot reuse envBool here
+ * because it lives in the server-only config module.
+ */
+function isPublicRollbarFlagEnabled(): boolean {
+	const value = process.env.NEXT_PUBLIC_ROLLBAR_ENABLED;
+	if (value === "0" || value === "false") return false;
+	return true;
+}
+
 const COMMON_SCRUB_FIELDS = [
 	"password",
 	"apiKey",
@@ -150,7 +162,7 @@ const clientRollbarEnabled = isClientRollbarEnabled({
 	isTestMode,
 	isE2EMode,
 	isExplicitlyDisabled: isExplicitlyDisabled,
-	publicEnabled: process.env.NEXT_PUBLIC_ROLLBAR_ENABLED === "1",
+	publicEnabled: isPublicRollbarFlagEnabled(),
 	clientToken: clientRollbarToken,
 });
 
