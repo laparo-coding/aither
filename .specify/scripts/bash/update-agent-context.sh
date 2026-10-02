@@ -238,9 +238,10 @@ get_project_structure() {
     local project_type="$1"
     
     if [[ "$project_type" == *"web"* ]]; then
-        echo "backend/\\nfrontend/\\ntests/"
+        # Emit real newlines — literal \n sequences break downstream consumers
+        printf '%s\n' 'backend/' 'frontend/' 'tests/'
     else
-        echo "src/\\ntests/"
+        printf '%s\n' 'src/' 'tests/'
     fi
 }
 
@@ -255,7 +256,7 @@ get_commands_for_language() {
             echo "cargo test && cargo clippy"
             ;;
         *"JavaScript"*|*"TypeScript"*)
-            echo "npm test \\&\\& npm run lint"
+            echo "npm test && npm run lint"
             ;;
         *)
             echo "# Add commands for $lang"
@@ -301,59 +302,60 @@ create_new_agent_file() {
     local language_conventions
     language_conventions=$(get_language_conventions "$NEW_LANG")
     
-    # Perform substitutions with error checking using safer approach
-    # Escape special characters for sed by using a different delimiter or escaping
-    local escaped_lang=$(printf '%s\n' "$NEW_LANG" | sed 's/[\[\.*^$()+{}|]/\\&/g')
-    local escaped_framework=$(printf '%s\n' "$NEW_FRAMEWORK" | sed 's/[\[\.*^$()+{}|]/\\&/g')
-    local escaped_branch=$(printf '%s\n' "$CURRENT_BRANCH" | sed 's/[\[\.*^$()+{}|]/\\&/g')
-    
-    # Build technology stack and recent change strings conditionally
+    # Build technology stack and recent change strings conditionally.
+    # NOTE: values are used RAW — the perl substitution below quotes the
+    # placeholder with \Q...\E, so no sed-style escaping is needed (and would
+    # leak literal backslashes into the generated file).
     local tech_stack
-    if [[ -n "$escaped_lang" && -n "$escaped_framework" ]]; then
-        tech_stack="- $escaped_lang + $escaped_framework ($escaped_branch)"
-    elif [[ -n "$escaped_lang" ]]; then
-        tech_stack="- $escaped_lang ($escaped_branch)"
-    elif [[ -n "$escaped_framework" ]]; then
-        tech_stack="- $escaped_framework ($escaped_branch)"
+    if [[ -n "$NEW_LANG" && -n "$NEW_FRAMEWORK" ]]; then
+        tech_stack="- $NEW_LANG + $NEW_FRAMEWORK ($CURRENT_BRANCH)"
+    elif [[ -n "$NEW_LANG" ]]; then
+        tech_stack="- $NEW_LANG ($CURRENT_BRANCH)"
+    elif [[ -n "$NEW_FRAMEWORK" ]]; then
+        tech_stack="- $NEW_FRAMEWORK ($CURRENT_BRANCH)"
     else
-        tech_stack="- ($escaped_branch)"
+        tech_stack="- ($CURRENT_BRANCH)"
     fi
 
     local recent_change
-    if [[ -n "$escaped_lang" && -n "$escaped_framework" ]]; then
-        recent_change="- $escaped_branch: Added $escaped_lang + $escaped_framework"
-    elif [[ -n "$escaped_lang" ]]; then
-        recent_change="- $escaped_branch: Added $escaped_lang"
-    elif [[ -n "$escaped_framework" ]]; then
-        recent_change="- $escaped_branch: Added $escaped_framework"
+    if [[ -n "$NEW_LANG" && -n "$NEW_FRAMEWORK" ]]; then
+        recent_change="- $CURRENT_BRANCH: Added $NEW_LANG + $NEW_FRAMEWORK"
+    elif [[ -n "$NEW_LANG" ]]; then
+        recent_change="- $CURRENT_BRANCH: Added $NEW_LANG"
+    elif [[ -n "$NEW_FRAMEWORK" ]]; then
+        recent_change="- $CURRENT_BRANCH: Added $NEW_FRAMEWORK"
     else
-        recent_change="- $escaped_branch: Added"
+        recent_change="- $CURRENT_BRANCH: Added"
     fi
 
+    # NOTE: Placeholders are substituted with perl instead of sed.
+    # sed cannot handle real newlines inside the replacement string
+    # ("unescaped newline inside substitute pattern"), which forced the
+    # previous implementation to emit literal \n sequences and convert
+    # them in a second pass. perl has no such limitation, so the values
+    # can contain real newlines directly.
     local substitutions=(
-        "s|\[PROJECT NAME\]|$project_name|"
-        "s|\[DATE\]|$current_date|"
-        "s|\[EXTRACTED FROM ALL PLAN.MD FILES\]|$tech_stack|"
-        "s|\[ACTUAL STRUCTURE FROM PLANS\]|$project_structure|g"
-        "s|\[ONLY COMMANDS FOR ACTIVE TECHNOLOGIES\]|$commands|"
-        "s|\[LANGUAGE-SPECIFIC, ONLY FOR LANGUAGES IN USE\]|$language_conventions|"
-        "s|\[LAST 3 FEATURES AND WHAT THEY ADDED\]|$recent_change|"
+        "[PROJECT NAME]|$project_name"
+        "[DATE]|$current_date"
+        "[EXTRACTED FROM ALL PLAN.MD FILES]|$tech_stack"
+        "[ACTUAL STRUCTURE FROM PLANS]|$project_structure"
+        "[ONLY COMMANDS FOR ACTIVE TECHNOLOGIES]|$commands"
+        "[LANGUAGE-SPECIFIC, ONLY FOR LANGUAGES IN USE]|$language_conventions"
+        "[LAST 3 FEATURES AND WHAT THEY ADDED]|$recent_change"
     )
     
     for substitution in "${substitutions[@]}"; do
-        if ! sed -i.bak -e "$substitution" "$temp_file"; then
-            log_error "Failed to perform substitution: $substitution"
+        local placeholder="${substitution%%|*}"
+        local replacement="${substitution#*|}"
+        if ! PLACEHOLDER="$placeholder" REPLACEMENT="$replacement" perl -pi -e 's/\Q$ENV{PLACEHOLDER}\E/$ENV{REPLACEMENT}/g' "$temp_file"; then
+            log_error "Failed to perform substitution: $placeholder"
             rm -f "$temp_file" "$temp_file.bak"
             return 1
         fi
     done
     
-    # Convert \n sequences to actual newlines
-    newline=$(printf '\n')
-    sed -i.bak2 "s/\\\\n/${newline}/g" "$temp_file"
-    
     # Clean up backup files
-    rm -f "$temp_file.bak" "$temp_file.bak2"
+    rm -f "$temp_file.bak"
     
     return 0
 }

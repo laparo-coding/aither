@@ -1,6 +1,6 @@
 "use client";
 
-import { clientInstance } from "@/lib/monitoring/rollbar-official";
+import { clientInstance } from "@/lib/monitoring/rollbar-client";
 import { useEffect } from "react";
 
 interface GlobalErrorProps {

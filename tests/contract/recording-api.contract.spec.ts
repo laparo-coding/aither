@@ -155,7 +155,9 @@ describe("POST /api/recording/start", () => {
 
 	it("returns 200 with session data on successful start", async () => {
 		const { POST } = await import("@/app/api/recording/start/route");
-		const req = createRequest("http://localhost:3000/api/recording/start");
+		const req = createJsonRequest("http://localhost:3000/api/recording/start", {
+			bookingId: "booking-001",
+		});
 		const res = await POST(req);
 
 		expect(res.status).toBe(200);
@@ -173,7 +175,9 @@ describe("POST /api/recording/start", () => {
 		);
 
 		const { POST } = await import("@/app/api/recording/start/route");
-		const req = createRequest("http://localhost:3000/api/recording/start");
+		const req = createJsonRequest("http://localhost:3000/api/recording/start", {
+			bookingId: "booking-001",
+		});
 		const res = await POST(req);
 
 		expect(res.status).toBe(409);
@@ -188,7 +192,9 @@ describe("POST /api/recording/start", () => {
 		);
 
 		const { POST } = await import("@/app/api/recording/start/route");
-		const req = createRequest("http://localhost:3000/api/recording/start");
+		const req = createJsonRequest("http://localhost:3000/api/recording/start", {
+			bookingId: "booking-001",
+		});
 		const res = await POST(req);
 
 		expect(res.status).toBe(503);
@@ -202,7 +208,9 @@ describe("POST /api/recording/start", () => {
 		);
 
 		const { POST } = await import("@/app/api/recording/start/route");
-		const req = createRequest("http://localhost:3000/api/recording/start");
+		const req = createJsonRequest("http://localhost:3000/api/recording/start", {
+			bookingId: "booking-001",
+		});
 		const res = await POST(req);
 
 		expect(res.status).toBe(503);
