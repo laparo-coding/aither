@@ -79,3 +79,7 @@ output/
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+
+# Codacy baseline — locally generated, contains org/repo metadata and
+# the full baseline'd pattern list; not needed by CI or runtime
+.codacy/codacy.config.baseline.json
