@@ -24,12 +24,21 @@ vi.mock("@/lib/monitoring/rollbar-official", () => ({
 
 const mockStopRecording = vi.fn();
 const mockUploadToMux = vi.fn();
+const mockUpsertWorkflow = vi.fn().mockResolvedValue({});
 
 vi.mock("@/lib/recording/session-manager", () => ({
 	stopRecording: (...args: unknown[]) => mockStopRecording(...args),
 }));
 vi.mock("@/lib/recording/mux-uploader", () => ({
 	uploadToMux: (...args: unknown[]) => mockUploadToMux(...args),
+}));
+vi.mock("@/lib/recording/source-staging", () => ({
+	uploadRecordingToStaging: vi.fn().mockResolvedValue("seminar-sources/booking-1/rec-001.mp4"),
+}));
+vi.mock("@/lib/transcription/hemera-seminar-client", () => ({
+	createHemeraSeminarRecordingClient: () => ({
+		upsertWorkflow: (...args: unknown[]) => mockUpsertWorkflow(...args),
+	}),
 }));
 
 import { POST } from "@/app/api/recording/stop/route";
@@ -43,11 +52,13 @@ describe("POST /api/recording/stop — transcription queueing", () => {
 		vi.clearAllMocks();
 	});
 
-	it("reports queuedForTranscription=false until Hemera workflow wiring is complete", async () => {
+	it("reports queuedForTranscription=true after staging and Hemera enqueue succeed", async () => {
 		mockStopRecording.mockResolvedValue({
 			sessionId: "rec-001",
+			bookingId: "booking-1",
 			status: "completed",
 			filename: "rec-001.mp4",
+			filePath: "/tmp/rec-001.mp4",
 			startedAt: "2026-09-30T10:00:00.000Z",
 			endedAt: "2026-09-30T10:15:00.000Z",
 			duration: 900,
@@ -55,18 +66,28 @@ describe("POST /api/recording/stop — transcription queueing", () => {
 		});
 
 		const res = await POST(createRequest());
-		const body = (await res.json()) as { data?: { queuedForTranscription?: boolean } };
+		const body = (await res.json()) as {
+			data?: { queuedForTranscription?: boolean; sourceStagingPathname?: string };
+		};
 
 		expect(res.status).toBe(200);
-		// The stop route deliberately reports queuedForTranscription: false until
-		// the Hemera workflow upsert is wired — never claim success for a
-		// workflow that was not created (FR-001/FR-019/FR-021).
-		expect(body.data?.queuedForTranscription).toBe(false);
+		expect(body.data?.queuedForTranscription).toBe(true);
+		expect(body.data?.sourceStagingPathname).toBe("seminar-sources/booking-1/rec-001.mp4");
+		expect(mockUpsertWorkflow).toHaveBeenCalledWith(
+			"booking-1",
+			"rec-001",
+			expect.objectContaining({
+				status: "queued",
+				sourceBlobPathname: "seminar-sources/booking-1/rec-001.mp4",
+			}),
+			"booking-1:rec-001",
+		);
 	});
 
 	it("does not queue transcription for a failed or interrupted recording", async () => {
 		mockStopRecording.mockResolvedValue({
 			sessionId: "rec-002",
+			bookingId: "booking-1",
 			status: "failed",
 			filename: "rec-002.mp4",
 			startedAt: "2026-09-30T10:00:00.000Z",
@@ -85,8 +106,10 @@ describe("POST /api/recording/stop — transcription queueing", () => {
 	it("never calls MUX during the stop flow", async () => {
 		mockStopRecording.mockResolvedValue({
 			sessionId: "rec-003",
+			bookingId: "booking-1",
 			status: "completed",
 			filename: "rec-003.mp4",
+			filePath: "/tmp/rec-003.mp4",
 			startedAt: "2026-09-30T10:00:00.000Z",
 			endedAt: "2026-09-30T10:15:00.000Z",
 			duration: 900,
@@ -101,8 +124,10 @@ describe("POST /api/recording/stop — transcription queueing", () => {
 	it("returns the deterministic private staging pathname for a queued recording", async () => {
 		mockStopRecording.mockResolvedValue({
 			sessionId: "rec-004",
+			bookingId: "booking-1",
 			status: "completed",
 			filename: "rec-004.mp4",
+			filePath: "/tmp/rec-004.mp4",
 			startedAt: "2026-09-30T10:00:00.000Z",
 			endedAt: "2026-09-30T10:15:00.000Z",
 			duration: 900,

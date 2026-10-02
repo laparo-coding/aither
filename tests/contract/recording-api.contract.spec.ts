@@ -43,12 +43,15 @@ const mockStartRecording = vi.fn().mockResolvedValue({
 	endedAt: null,
 	duration: null,
 	maxDurationReached: false,
+	bookingId: "booking-001",
 });
 
 const mockStopRecording = vi.fn().mockResolvedValue({
 	sessionId: "rec_2025-01-15T10-30-00Z",
+	bookingId: "booking-001",
 	status: "completed",
 	filename: "rec_2025-01-15T10-30-00Z.mp4",
+	filePath: "/tmp/rec_2025-01-15T10-30-00Z.mp4",
 	startedAt: "2025-01-15T10:30:00.000Z",
 	endedAt: "2025-01-15T10:35:00.000Z",
 	duration: 300,
@@ -64,6 +67,22 @@ vi.mock("@/lib/recording/session-manager", () => ({
 	getSessionState: (...args: unknown[]) => mockGetSessionState(...args),
 	isRecording: (...args: unknown[]) => mockIsRecording(...args),
 	_resetState: vi.fn(),
+}));
+
+const mockGetBookingContext = vi.fn().mockResolvedValue({
+	bookingId: "booking-001",
+	participantUserId: "participant-001",
+	courseId: "course-001",
+});
+const mockUpsertWorkflow = vi.fn().mockResolvedValue({});
+vi.mock("@/lib/transcription/hemera-seminar-client", () => ({
+	createHemeraSeminarRecordingClient: () => ({
+		getBookingContext: (...args: unknown[]) => mockGetBookingContext(...args),
+		upsertWorkflow: (...args: unknown[]) => mockUpsertWorkflow(...args),
+	}),
+}));
+vi.mock("@/lib/recording/source-staging", () => ({
+	uploadRecordingToStaging: vi.fn().mockResolvedValue("seminar-sources/booking-001/recording.mp4"),
 }));
 
 // File manager mock (US2)
