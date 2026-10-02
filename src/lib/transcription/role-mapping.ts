@@ -7,7 +7,7 @@
 
 import type { DiarizedUtterance, MappingValidationResult, SeminarRole } from "./types";
 import { SEMINAR_ROLES } from "./types";
-import { isValidAutomaticMapping, normalizeUtteranceText } from "./workflow";
+import { countVisibleGraphemes, isValidAutomaticMapping } from "./workflow";
 
 export interface SpeakerIdentificationResult {
 	status: string;
@@ -76,7 +76,7 @@ export function validateOperatorMapping(
 	for (const role of SEMINAR_ROLES) {
 		const speaker = mapping[role];
 		const hasContent = utterances.some(
-			(u) => u.speakerId === speaker && normalizeUtteranceText(u.text).length >= 2,
+			(u) => u.speakerId === speaker && countVisibleGraphemes(u.text) >= 2,
 		);
 		if (!hasContent) {
 			return { valid: false, reason: `role_${role}_no_content`, mapping };

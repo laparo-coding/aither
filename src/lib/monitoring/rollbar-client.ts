@@ -170,7 +170,7 @@ const baseConfig = {
 	// In development, disable automatic capture to reduce noise
 	captureUncaught: true,
 	captureUnhandledRejections: true,
-	environment: process.env.NEXT_PUBLIC_NODE_ENV || "development",
+	environment: process.env.NODE_ENV || "development",
 };
 
 export const clientConfig = {

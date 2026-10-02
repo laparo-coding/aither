@@ -1,5 +1,9 @@
 import { getRouteAuth } from "@/lib/auth/route-auth";
-import middleware, { isAuthorizedSyncServiceRequest, isDevAuthBypassEnabled } from "@/proxy";
+import middleware, {
+	isAuthorizedSyncServiceRequest,
+	isClerkAuthBypassedPath,
+	isDevAuthBypassEnabled,
+} from "@/proxy";
 import { type NextFetchEvent, NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -76,6 +80,19 @@ describe("development auth bypass", () => {
 describe("isAuthorizedSyncServiceRequest", () => {
 	afterEach(() => {
 		process.env.AITHER_SYNC_TOKEN = "";
+	});
+
+	describe("service-key routes bypass Clerk only at exact route scope", () => {
+		it("exempts the document access and recording deletion handlers from Clerk", () => {
+			expect(isClerkAuthBypassedPath("/api/service/seminar-document-access")).toBe(true);
+			expect(isClerkAuthBypassedPath("/api/service/seminar-recordings/rec_123")).toBe(true);
+		});
+
+		it("does not exempt neighboring service routes", () => {
+			expect(isClerkAuthBypassedPath("/api/service/bookings/booking-1")).toBe(false);
+			expect(isClerkAuthBypassedPath("/api/service/seminar-recordings/rec_123/extra")).toBe(false);
+			expect(isClerkAuthBypassedPath("/api/service/seminar-document-access-extra")).toBe(false);
+		});
 	});
 
 	it("returns true for /api/sync with a valid bearer token", () => {

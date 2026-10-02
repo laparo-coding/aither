@@ -11,6 +11,7 @@ import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { startRecording } from "@/lib/recording/session-manager";
+import { createHemeraSeminarRecordingClient } from "@/lib/transcription/hemera-seminar-client";
 import { BookingContextSchema } from "@/lib/transcription/schemas";
 import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/utils/api-response";
 import type { NextRequest } from "next/server";
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 	}
 
 	// Feature 012: a recording must be bound to a validated Hemera booking
-	let bookingId: string | undefined;
+	let bookingId: string;
 	try {
 		const body = (await request.json()) as { bookingId?: unknown };
 		const parsed = BookingContextSchema.pick({ bookingId: true }).safeParse(body);
@@ -46,14 +47,38 @@ export async function POST(request: NextRequest) {
 		);
 	}
 
+	let booking: Awaited<
+		ReturnType<ReturnType<typeof createHemeraSeminarRecordingClient>["getBookingContext"]>
+	>;
 	try {
-		const session = await startRecording();
+		booking = await createHemeraSeminarRecordingClient().getBookingContext(bookingId);
+	} catch (err) {
+		const status = (err as { status?: number }).status ?? 0;
+		if (status === 404) {
+			return createErrorResponse(
+				"Booking was not found in Hemera",
+				ErrorCodes.NOT_FOUND,
+				undefined,
+				404,
+			);
+		}
+		reportError(err instanceof Error ? err : new Error(String(err)), undefined, "error");
+		return createErrorResponse(
+			"Hemera booking validation is unavailable",
+			ErrorCodes.EXTERNAL_SERVICE_ERROR,
+			undefined,
+			503,
+		);
+	}
+
+	try {
+		const session = await startRecording(booking);
 		return createSuccessResponse({
 			sessionId: session.sessionId,
 			status: session.status,
 			filename: session.filename,
 			startedAt: session.startedAt,
-			bookingId,
+			bookingId: session.bookingId,
 		});
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);

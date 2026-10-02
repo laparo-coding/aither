@@ -20,7 +20,7 @@
    ```
 
 3. Set server-only `ASSEMBLY_AI_BASE_URL` to the API endpoint/region enabled for the active AssemblyAI Free-plan account. Verify the endpoint against the account before use; Aither has no automatic regional fallback.
-4. Configure the AssemblyAI webhook URL and webhook secret, MUX signing-key values, Aither-Hemera service authentication, and Blob token in the local environment. Use distinct values per environment.
+4. Configure `AITHER_PUBLIC_BASE_URL` as the public HTTPS origin of the current deployment, plus the AssemblyAI webhook secret, MUX signing-key values, Aither-Hemera service authentication, and Blob token. The worker derives each callback URL from this origin and the recording ID. Use distinct values per environment.
 5. Production Linux uses a root-owned, permission-restricted systemd `EnvironmentFile=` outside the repository for `ASSEMBLY_AI_API_KEY`, `ASSEMBLY_AI_BASE_URL`, and other server-only values; it must not attempt to invoke macOS Keychain.
 
 ## Run the Workflow

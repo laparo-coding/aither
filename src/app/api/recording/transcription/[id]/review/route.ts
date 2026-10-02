@@ -7,7 +7,13 @@
 // ---------------------------------------------------------------------------
 
 import { getRouteAuth } from "@/lib/auth/route-auth";
+import { loadConfig } from "@/lib/config";
+import {
+	AssemblyAiAdapter,
+	type AssemblyAiTranscript,
+} from "@/lib/transcription/assemblyai-client";
 import { createHemeraSeminarRecordingClient } from "@/lib/transcription/hemera-seminar-client";
+import { validateOperatorMapping } from "@/lib/transcription/role-mapping";
 import { OperatorReviewSchema } from "@/lib/transcription/schemas";
 import type { SeminarRecordingWorkflow } from "@/lib/transcription/types";
 import { type NextRequest, NextResponse } from "next/server";
@@ -77,6 +83,54 @@ export async function PUT(
 			{ error: `Workflow is not reviewable (current status: ${workflow.status})` },
 			{ status: 409 },
 		);
+	}
+	if (workflow.bookingId !== bookingId || !workflow.assemblyAiTranscriptId) {
+		return NextResponse.json({ error: "Workflow transcript is unavailable" }, { status: 409 });
+	}
+
+	let transcript: AssemblyAiTranscript;
+	try {
+		const config = loadConfig();
+		if (
+			!config.ASSEMBLY_AI_BASE_URL ||
+			!config.ASSEMBLY_AI_API_KEY ||
+			!config.ASSEMBLY_AI_WEBHOOK_SECRET ||
+			!config.AITHER_PUBLIC_BASE_URL
+		) {
+			throw new Error("AssemblyAI review configuration is incomplete");
+		}
+		const webhookUrl = new URL("/api/assemblyai/webhook", config.AITHER_PUBLIC_BASE_URL);
+		webhookUrl.searchParams.set("recordingId", recordingId);
+		const assemblyai = new AssemblyAiAdapter({
+			baseUrl: config.ASSEMBLY_AI_BASE_URL,
+			apiKey: config.ASSEMBLY_AI_API_KEY,
+			webhookUrl: webhookUrl.toString(),
+			webhookSecret: config.ASSEMBLY_AI_WEBHOOK_SECRET,
+		});
+		transcript = await assemblyai.getTranscript(workflow.assemblyAiTranscriptId);
+	} catch (err) {
+		console.error(
+			"[review] Failed to fetch provider transcript:",
+			err instanceof Error ? err.name : "unknown",
+		);
+		return NextResponse.json({ error: "Transcript unavailable" }, { status: 502 });
+	}
+	if (transcript.status !== "completed" || !transcript.utterances) {
+		return NextResponse.json({ error: "Transcript is not complete" }, { status: 409 });
+	}
+
+	const validation = validateOperatorMapping(
+		leaderSpeakerId,
+		participantSpeakerId,
+		transcript.utterances.map((utterance) => ({
+			speakerId: utterance.speaker || null,
+			text: utterance.text,
+			startMs: utterance.start,
+			endMs: utterance.end,
+		})),
+	);
+	if (!validation.valid) {
+		return NextResponse.json({ error: validation.reason }, { status: 422 });
 	}
 
 	// Persist the approved mapping to Hemera as the authoritative record

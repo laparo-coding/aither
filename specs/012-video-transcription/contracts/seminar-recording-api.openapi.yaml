@@ -374,6 +374,10 @@ components:
           type: [string, 'null']
           format: uri
           description: Stable MUX playback URL/reference sent directly from Aither to Hemera after upload. It contains no signed playback token; participants receive a fresh signed URL after booking authorization.
+        durationSeconds:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+          description: MUX-reported video duration used to mint playback tokens that last through the full recording.
         transcriptBlobPathname:
           type: [string, 'null']
         lastErrorCode:
@@ -384,6 +388,10 @@ components:
             type: integer
             minimum: 0
             maximum: 5
+        nextAttemptAt:
+          type: [string, 'null']
+          format: date-time
+          description: Earliest time the worker may retry the current failed stage.
         assemblyAiCleanupStatus:
           type: string
           enum: [pending, complete, retryable_failure, not_required]

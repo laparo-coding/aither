@@ -6,6 +6,11 @@
 // ---------------------------------------------------------------------------
 
 import { loadConfig } from "@/lib/config";
+import { reconcileAssemblyAiCallback } from "@/lib/transcription/callback-reconciler";
+import {
+	HemeraApiError,
+	createHemeraSeminarRecordingClient,
+} from "@/lib/transcription/hemera-seminar-client";
 import { AssemblyAiCallbackSchema } from "@/lib/transcription/schemas";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -17,8 +22,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
 	const recordingId = request.nextUrl.searchParams.get("recordingId");
-	if (!recordingId) {
-		return NextResponse.json({ error: "Missing recordingId" }, { status: 400 });
+	const bookingId = request.nextUrl.searchParams.get("bookingId");
+	if (!recordingId || !bookingId) {
+		return NextResponse.json({ error: "Missing bookingId or recordingId" }, { status: 400 });
 	}
 
 	// Authenticate the callback (FR-028)
@@ -40,19 +46,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 		return NextResponse.json({ error: "Invalid callback body" }, { status: 400 });
 	}
 
-	// The worker reconciles against canonical Hemera state; the webhook only
-	// records the delivery signal. Duplicate/stale callbacks are idempotent
-	// because the worker re-reads the workflow before acting (FR-028).
-	// Sanitized trace only: transcript ID and status, never payload content.
-	return NextResponse.json(
-		{
-			accepted: true,
-			recordingId,
-			transcriptId: parsed.data.transcript_id,
-			status: parsed.data.status,
-		},
-		{ status: 202 },
-	);
+	const hemera = createHemeraSeminarRecordingClient();
+	try {
+		const result = await reconcileAssemblyAiCallback(hemera, bookingId, recordingId, parsed.data);
+		return NextResponse.json({ accepted: true, recordingId, result }, { status: 202 });
+	} catch (error) {
+		if (error instanceof HemeraApiError && error.status === 404) {
+			return NextResponse.json({ error: "Workflow not found" }, { status: 404 });
+		}
+		console.error(
+			"[assemblyai-webhook] Failed to reconcile callback:",
+			error instanceof Error ? error.name : "unknown",
+		);
+		return NextResponse.json({ error: "Workflow reconciliation unavailable" }, { status: 503 });
+	}
 }
 
 export async function GET(): Promise<NextResponse> {

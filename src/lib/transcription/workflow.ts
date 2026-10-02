@@ -58,6 +58,19 @@ export function normalizeUtteranceText(text: string): string {
 		.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\uFEFF]+$/u, "");
 }
 
+/** Counts visible grapheme clusters after trimming Unicode whitespace. */
+export function countVisibleGraphemes(text: string): number {
+	const normalized = normalizeUtteranceText(text);
+	if (!normalized) return 0;
+
+	const segmenter = new Intl.Segmenter("und", { granularity: "grapheme" });
+	let count = 0;
+	for (const { segment } of segmenter.segment(normalized)) {
+		if (/[\p{L}\p{N}\p{P}\p{S}]/u.test(segment)) count += 1;
+	}
+	return count;
+}
+
 export interface AutomaticMappingInput {
 	speakerIdentificationStatus: string;
 	utterances: DiarizedUtterance[];
@@ -113,7 +126,7 @@ export function isValidAutomaticMapping(input: AutomaticMappingInput): MappingVa
 	for (const role of roles) {
 		const speaker = mapping[role];
 		const hasContent = ordered.some(
-			(u) => u.speakerId === speaker && normalizeUtteranceText(u.text).length >= 2,
+			(u) => u.speakerId === speaker && countVisibleGraphemes(u.text) >= 2,
 		);
 		if (!hasContent) {
 			return { valid: false, reason: `role_${role}_no_content; review_required` };

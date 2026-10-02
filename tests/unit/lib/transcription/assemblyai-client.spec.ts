@@ -44,6 +44,10 @@ describe("submission configuration", () => {
 		const body = JSON.parse(String(init.body));
 		expect(body.audio_url).toBe(STAGING_URL);
 		expect(body.speaker_labels).toBe(true);
+		expect(body.speech_understanding.request.speaker_identification).toEqual({
+			speaker_type: "role",
+			known_values: ["Seminarleiter", "Teilnehmerin"],
+		});
 		expect(result.id).toBe("tx-123");
 	});
 
@@ -55,7 +59,7 @@ describe("submission configuration", () => {
 			);
 		const adapter = createAdapter({ fetchFn: fetchFn as unknown as typeof fetch });
 
-		await adapter.submitTranscription(STAGING_URL);
+		await adapter.submitTranscription(STAGING_URL, "rec-abc");
 
 		const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
 		const body = JSON.parse(String(init.body));
@@ -64,10 +68,10 @@ describe("submission configuration", () => {
 
 	it("requests contextual Speaker Identification for both roles", () => {
 		const config = buildSpeakerIdentificationConfig();
-		expect(config.expected_speakers).toBe(2);
-		expect(config.speakers).toHaveLength(2);
-		const roles = config.speakers.map((s: { custom_vocabulary?: string[] }) => s);
-		expect(roles).toBeDefined();
+		expect(config).toEqual({
+			speaker_type: "role",
+			known_values: ["Seminarleiter", "Teilnehmerin"],
+		});
 	});
 
 	it("sends the API key only via the authorization header", async () => {
@@ -98,6 +102,14 @@ describe("transcript retrieval", () => {
 						{ speaker: "A", text: "Guten Tag.", start: 0, end: 1500 },
 						{ speaker: "B", text: "Danke.", start: 2000, end: 3500 },
 					],
+					speech_understanding: {
+						response: {
+							speaker_identification: {
+								status: "success",
+								mapping: { A: "Seminarleiter", B: "Teilnehmerin" },
+							},
+						},
+					},
 				}),
 				{ status: 200 },
 			),
@@ -110,6 +122,10 @@ describe("transcript retrieval", () => {
 		expect(url).toBe("https://api.assemblyai.com/v2/transcript/tx-123");
 		expect(transcript.status).toBe("completed");
 		expect(transcript.utterances).toHaveLength(2);
+		expect(transcript.speech_understanding?.response?.speaker_identification?.mapping).toEqual({
+			A: "Seminarleiter",
+			B: "Teilnehmerin",
+		});
 	});
 
 	it("surfaces a provider error status without throwing", async () => {
@@ -162,5 +178,20 @@ describe("provider error handling", () => {
 		const adapter = createAdapter({ fetchFn: fetchFn as unknown as typeof fetch });
 
 		await expect(adapter.submitTranscription(STAGING_URL)).rejects.toThrow(/503/);
+	});
+
+	it("preserves Retry-After response headers on provider errors", async () => {
+		const fetchFn = vi.fn().mockResolvedValue(
+			new Response("rate limited", {
+				status: 429,
+				headers: { "Retry-After": "12" },
+			}),
+		);
+		const adapter = createAdapter({ fetchFn: fetchFn as unknown as typeof fetch });
+
+		await expect(adapter.submitTranscription(STAGING_URL)).rejects.toMatchObject({
+			status: 429,
+			headers: { "retry-after": "12" },
+		});
 	});
 });

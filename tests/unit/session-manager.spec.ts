@@ -43,6 +43,11 @@ vi.mock("@/lib/recording/ffmpeg-capture", () => ({
 
 describe("Session Manager", () => {
 	let sessionManager: typeof import("@/lib/recording/session-manager");
+	const booking = {
+		bookingId: "booking-123",
+		participantUserId: "participant-456",
+		courseId: "course-789",
+	};
 
 	beforeEach(async () => {
 		vi.clearAllMocks();
@@ -57,10 +62,12 @@ describe("Session Manager", () => {
 
 	describe("startRecording", () => {
 		it("starts a recording session successfully", async () => {
-			const session = await sessionManager.startRecording();
+			const session = await sessionManager.startRecording(booking);
 
 			expect(session).toBeDefined();
 			expect(session.sessionId).toMatch(/^rec_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z$/);
+			expect(session.bookingId).toBe(booking.bookingId);
+			expect(session.participantUserId).toBe(booking.participantUserId);
 			expect(session.status).toBe("recording");
 			expect(session.filename).toMatch(/\.mp4$/);
 			expect(session.startedAt).toBeDefined();
@@ -70,16 +77,16 @@ describe("Session Manager", () => {
 		});
 
 		it("throws CONFLICT when a session is already active", async () => {
-			await sessionManager.startRecording();
+			await sessionManager.startRecording(booking);
 
-			await expect(sessionManager.startRecording()).rejects.toThrow("CONFLICT:");
+			await expect(sessionManager.startRecording(booking)).rejects.toThrow("CONFLICT:");
 		});
 
 		it("throws FFMPEG_NOT_FOUND when FFmpeg is not installed", async () => {
 			const { isFFmpegAvailable } = await import("@/lib/recording/ffmpeg-capture");
 			vi.mocked(isFFmpegAvailable).mockResolvedValueOnce(false);
 
-			await expect(sessionManager.startRecording()).rejects.toThrow("FFMPEG_NOT_FOUND:");
+			await expect(sessionManager.startRecording(booking)).rejects.toThrow("FFMPEG_NOT_FOUND:");
 		});
 
 		it("throws WEBCAM_UNREACHABLE when stream URL is not configured", async () => {
@@ -89,18 +96,19 @@ describe("Session Manager", () => {
 				RECORDINGS_OUTPUT_DIR: "output/recordings",
 			} as ReturnType<typeof loadConfig>);
 
-			await expect(sessionManager.startRecording()).rejects.toThrow("WEBCAM_UNREACHABLE:");
+			await expect(sessionManager.startRecording(booking)).rejects.toThrow("WEBCAM_UNREACHABLE:");
 		});
 	});
 
 	describe("stopRecording", () => {
 		it("stops an active recording session", async () => {
-			await sessionManager.startRecording();
+			await sessionManager.startRecording(booking);
 			const session = await sessionManager.stopRecording();
 
 			expect(session.status).toBe("completed");
 			expect(session.endedAt).toBeDefined();
 			expect(session.duration).toBeGreaterThanOrEqual(0);
+			await expect(sessionManager.stopRecording()).resolves.toBe(session);
 		});
 
 		it("throws NOT_FOUND when no session is active", async () => {
@@ -114,7 +122,7 @@ describe("Session Manager", () => {
 		});
 
 		it("returns the current session", async () => {
-			await sessionManager.startRecording();
+			await sessionManager.startRecording(booking);
 			const state = sessionManager.getSessionState();
 
 			expect(state).toBeDefined();
@@ -128,14 +136,14 @@ describe("Session Manager", () => {
 		});
 
 		it("returns true when recording is in progress", async () => {
-			await sessionManager.startRecording();
+			await sessionManager.startRecording(booking);
 			expect(sessionManager.isRecording()).toBe(true);
 		});
 	});
 
 	describe("_resetState", () => {
 		it("clears all state", async () => {
-			await sessionManager.startRecording();
+			await sessionManager.startRecording(booking);
 			sessionManager._resetState();
 
 			expect(sessionManager.getSessionState()).toBeNull();

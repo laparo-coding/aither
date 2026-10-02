@@ -168,6 +168,8 @@ const EnvSchemaBase = z.object({
 	ASSEMBLY_AI_API_KEY: z.string().min(1).optional(),
 	// Independent webhook secret for callback authentication (FR-028)
 	ASSEMBLY_AI_WEBHOOK_SECRET: z.string().min(16).optional(),
+	// Public HTTPS origin used by the worker to construct callback URLs.
+	AITHER_PUBLIC_BASE_URL: z.string().url().optional(),
 	// MUX signed playback (FR-012)
 	MUX_SIGNING_KEY_ID: z.string().min(1).optional(),
 	MUX_SIGNING_KEY_PRIVATE_KEY: z.string().min(1).optional(),

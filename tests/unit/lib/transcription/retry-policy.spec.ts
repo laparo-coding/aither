@@ -107,6 +107,25 @@ describe("provider-specific circuit breaker", () => {
 		expect(breaker.isOpen()).toBe(false);
 	});
 
+	it("allows only one in-flight half-open probe", () => {
+		const breaker = new CircuitBreaker({ failureThreshold: 5, windowMs: 60_000, openMs: 0 });
+		for (let i = 0; i < 5; i += 1) breaker.recordFailure();
+
+		expect(breaker.canAttempt()).toBe(true);
+		expect(breaker.canAttempt()).toBe(false);
+		breaker.recordSuccess();
+		expect(breaker.canAttempt()).toBe(true);
+	});
+
+	it("releases a half-open probe after a permanent response", () => {
+		const breaker = new CircuitBreaker({ failureThreshold: 5, windowMs: 60_000, openMs: 0 });
+		for (let i = 0; i < 5; i += 1) breaker.recordFailure();
+
+		expect(breaker.canAttempt()).toBe(true);
+		breaker.recordNonTransientFailure();
+		expect(breaker.canAttempt()).toBe(true);
+	});
+
 	it("reopens after a transient half-open failure", () => {
 		const breaker = new CircuitBreaker({ failureThreshold: 5, windowMs: 60_000, openMs: 0 });
 		for (let i = 0; i < 5; i += 1) {

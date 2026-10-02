@@ -10,11 +10,13 @@
 //                         explicit enqueue/retry path (FR-001/FR-019/FR-021).
 // ---------------------------------------------------------------------------
 
+import { unlink } from "node:fs/promises";
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { stopRecording } from "@/lib/recording/session-manager";
-import { buildSourceStagingPathname } from "@/lib/recording/source-staging";
+import { uploadRecordingToStaging } from "@/lib/recording/source-staging";
+import { createHemeraSeminarRecordingClient } from "@/lib/transcription/hemera-seminar-client";
 import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/utils/api-response";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -44,27 +46,39 @@ export async function POST(_req: NextRequest) {
 			});
 		}
 
-		// Feature 012: idempotently create the Hemera workflow with the
-		// real bookingId from the session, then report the queued intent.
-		// If Hemera is unreachable, return queuedForTranscription: false
-		// so the caller knows to retry via the worker.
-		const bookingId = (session as Record<string, unknown>).bookingId as string | undefined;
-		const effectiveBookingId = bookingId ?? "pending-booking";
-
-		let workflowCreated = false;
+		const bookingId = session.bookingId;
+		const pathname = await uploadRecordingToStaging(bookingId, session.sessionId, session.filePath);
 		try {
-			// TODO: Wire real Hemera client and call upsertWorkflow here
-			// const pathname = await uploadToStaging(session.sessionId);
-			// await hemera.upsertWorkflow(effectiveBookingId, session.sessionId, {
-			//   status: "queued",
-			//   sourceBlobPathname: pathname,
-			// });
-			// Keep false until Hemera wiring is complete — do not report
-			// queuedForTranscription: true for a workflow that was never created
-			workflowCreated = false;
-		} catch {
-			// Hemera unreachable — retain staged object for worker retry path
-			workflowCreated = false;
+			const hemera = createHemeraSeminarRecordingClient();
+			await hemera.upsertWorkflow(
+				bookingId,
+				session.sessionId,
+				{
+					status: "queued",
+					recordingDate: session.startedAt,
+					queuedAt: new Date().toISOString(),
+					firstProviderAttemptAt: null,
+					sourceBlobPathname: pathname,
+					stageAttemptCounts: {},
+				},
+				`${bookingId}:${session.sessionId}`,
+			);
+		} catch (err) {
+			reportError(err instanceof Error ? err : new Error(String(err)), undefined, "error");
+			return createErrorResponse(
+				"Recording is staged but could not be added to the transcription queue; retry stopping to enqueue it",
+				ErrorCodes.EXTERNAL_SERVICE_ERROR,
+				undefined,
+				503,
+			);
+		}
+
+		try {
+			await unlink(session.filePath);
+		} catch (err) {
+			if (!(err instanceof Error && "code" in err && err.code === "ENOENT")) {
+				reportError(err instanceof Error ? err : new Error(String(err)), undefined, "warning");
+			}
 		}
 
 		return createSuccessResponse({
@@ -75,14 +89,18 @@ export async function POST(_req: NextRequest) {
 			endedAt: session.endedAt,
 			duration: session.duration,
 			fileSize: session.fileSize,
-			queuedForTranscription: workflowCreated,
-			sourceStagingPathname: buildSourceStagingPathname(effectiveBookingId, session.sessionId),
+			queuedForTranscription: true,
+			sourceStagingPathname: pathname,
 		});
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
 
 		if (message.startsWith("NOT_FOUND:")) {
 			return createErrorResponse(message, ErrorCodes.NOT_FOUND, undefined, 404);
+		}
+		if (message.startsWith("BLOB_STORAGE_UNAVAILABLE:")) {
+			reportError(err instanceof Error ? err : new Error(message), undefined, "error");
+			return createErrorResponse(message, ErrorCodes.EXTERNAL_SERVICE_ERROR, undefined, 503);
 		}
 
 		// Unexpected error

@@ -65,6 +65,7 @@ export class CircuitBreaker {
 	private state: BreakerState = "closed";
 	private failureTimestamps: number[] = [];
 	private openUntil = 0;
+	private halfOpenProbeInFlight = false;
 
 	constructor(private readonly options: CircuitBreakerOptions) {}
 
@@ -72,6 +73,7 @@ export class CircuitBreaker {
 		if (this.state === "open") {
 			if (Date.now() >= this.openUntil) {
 				this.state = "half-open";
+				this.halfOpenProbeInFlight = false;
 				return false;
 			}
 			return true;
@@ -81,18 +83,25 @@ export class CircuitBreaker {
 
 	/** True when a call may be attempted (closed or half-open probe). */
 	canAttempt(): boolean {
-		return !this.isOpen();
+		if (this.isOpen()) return false;
+		if (this.state === "half-open") {
+			if (this.halfOpenProbeInFlight) return false;
+			this.halfOpenProbeInFlight = true;
+		}
+		return true;
 	}
 
 	recordSuccess(): void {
 		this.state = "closed";
 		this.failureTimestamps = [];
 		this.openUntil = 0;
+		this.halfOpenProbeInFlight = false;
 	}
 
 	scheduleReopen(delayMs: number): void {
 		this.state = "open";
 		this.openUntil = Date.now() + delayMs;
+		this.halfOpenProbeInFlight = false;
 	}
 
 	recordFailure(): void {
@@ -105,6 +114,7 @@ export class CircuitBreaker {
 			// Transient half-open failure reopens the circuit
 			this.state = "open";
 			this.openUntil = now + this.options.openMs;
+			this.halfOpenProbeInFlight = false;
 			return;
 		}
 
@@ -112,5 +122,15 @@ export class CircuitBreaker {
 			this.state = "open";
 			this.openUntil = now + this.options.openMs;
 		}
+	}
+
+	/** Releases a half-open probe after a non-transient provider response. */
+	recordNonTransientFailure(): void {
+		if (this.state === "half-open") {
+			this.state = "closed";
+			this.failureTimestamps = [];
+			this.openUntil = 0;
+		}
+		this.halfOpenProbeInFlight = false;
 	}
 }

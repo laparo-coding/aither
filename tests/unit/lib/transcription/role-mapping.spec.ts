@@ -89,4 +89,13 @@ describe("validateOperatorMapping (manual review)", () => {
 		]);
 		expect(result.valid).toBe(false);
 	});
+
+	it("rejects one visible grapheme with multiple UTF-16 code units", () => {
+		const result = validateOperatorMapping("A", "B", [
+			{ speakerId: "A", text: "a\u0308", startMs: 0 },
+			{ speakerId: "B", text: "Vielen Dank.", startMs: 4200 },
+		]);
+		expect(result.valid).toBe(false);
+		expect(result.reason).toBe("role_Seminarleiter_no_content");
+	});
 });

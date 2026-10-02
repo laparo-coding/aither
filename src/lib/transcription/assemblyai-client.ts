@@ -9,7 +9,7 @@
 export interface AssemblyAiAdapterOptions {
 	baseUrl: string;
 	apiKey: string;
-	/** Public webhook URL including the recordingId query parameter. */
+	/** Public webhook URL; bookingId and recordingId are appended on submission. */
 	webhookUrl: string;
 	webhookSecret: string;
 	fetchFn?: typeof fetch;
@@ -28,12 +28,21 @@ export interface AssemblyAiTranscript {
 	error?: string;
 	utterances?: AssemblyAiUtterance[];
 	speech_model?: string;
+	speech_understanding?: {
+		response?: {
+			speaker_identification?: {
+				status: string;
+				mapping?: Record<string, string>;
+			};
+		};
+	};
 }
 
 export class AssemblyAiProviderError extends Error {
 	constructor(
 		public readonly status: number,
 		message: string,
+		public readonly headers: Record<string, string> = {},
 	) {
 		super(`AssemblyAI error ${status}: ${message}`);
 		this.name = "AssemblyAiProviderError";
@@ -43,20 +52,8 @@ export class AssemblyAiProviderError extends Error {
 /** Contextual Speaker Identification config for the two seminar roles. */
 export function buildSpeakerIdentificationConfig() {
 	return {
-		expected_speakers: 2,
-		speakers: [
-			{
-				speaker_type: "role" as const,
-				custom_vocabulary: ["Seminarleiter"],
-				keyterms_prompt:
-					"The seminar leader opens the session, gives instructions, and guides the discussion.",
-			},
-			{
-				speaker_type: "role" as const,
-				custom_vocabulary: ["Teilnehmerin"],
-				keyterms_prompt: "The participant replies, asks questions, and engages in the discussion.",
-			},
-		],
+		speaker_type: "role" as const,
+		known_values: ["Seminarleiter", "Teilnehmerin"],
 	};
 }
 
@@ -93,7 +90,10 @@ export class AssemblyAiAdapter {
 		});
 
 		if (!res.ok) {
-			throw new AssemblyAiProviderError(res.status, await res.text());
+			const headers = Object.fromEntries(
+				Array.from(res.headers.entries(), ([name, value]) => [name.toLowerCase(), value]),
+			);
+			throw new AssemblyAiProviderError(res.status, await res.text(), headers);
 		}
 
 		if (res.status === 204) {
@@ -103,17 +103,25 @@ export class AssemblyAiAdapter {
 	}
 
 	/** Submits an async transcription job from a scoped private staging URL. */
-	async submitTranscription(stagedMediaUrl: string): Promise<{ id: string; status: string }> {
+	async submitTranscription(
+		stagedMediaUrl: string,
+		recordingId?: string,
+		bookingId?: string,
+	): Promise<{ id: string; status: string }> {
+		const webhookUrl = new URL(this.webhookUrl);
+		if (recordingId) webhookUrl.searchParams.set("recordingId", recordingId);
+		if (bookingId) webhookUrl.searchParams.set("bookingId", bookingId);
 		const body = {
 			audio_url: stagedMediaUrl,
 			speaker_labels: true,
 			speech_model: "best",
-			webhook_url: this.webhookUrl,
+			webhook_url: webhookUrl.toString(),
 			webhook_auth_type: "signing_secret" as const,
 			webhook_auth_secret: this.webhookSecret,
-			speaker_identification: {
-				...buildSpeakerIdentificationConfig(),
-				speaker_type: "role" as const,
+			speech_understanding: {
+				request: {
+					speaker_identification: buildSpeakerIdentificationConfig(),
+				},
 			},
 		};
 		return this.request<{ id: string; status: string }>("/v2/transcript", {
