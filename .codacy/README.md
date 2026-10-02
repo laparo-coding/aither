@@ -38,3 +38,30 @@ git rm --cached .codacy/codacy.config.json
 
 Rule of thumb: real configuration lives in `codacy.yaml` and `biome.json`.
 Everything the CLI generates under `.codacy/` stays local.
+
+## CI integration
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) uses Codacy in two
+places — neither requires the generated files in VCS:
+
+| CI step | What it does | Codacy files involved |
+|---------|--------------|----------------------|
+| `Upload coverage to Codacy` | Uploads `coverage/lcov.info` via the coverage reporter | none (token-based upload) |
+| `Run Codacy Trivy security scan` | `./.codacy/cli.sh analyze -t trivy --format sarif` | `cli.sh` downloads the `codacy-cli-v2` binary, which generates `codacy.config.json`/`codacy.config.baseline.json` locally on first run, then executes Trivy |
+
+The baseline is therefore a **local CLI cache**, not a CI input: the runner
+regenerates it from the Codacy cloud config (`codacy.yaml`) on every job.
+
+## Coexistence with other tooling
+
+| Tool | Scope | Config | Overlap with Codacy |
+|------|-------|--------|---------------------|
+| Biome | Local lint + format (pre-commit, `npm run lint`) | `biome.json` | Codacy pins `biome@1.9.0` in `codacy.yaml` and reuses the same `biome.json` via `useLocalConfigurationFile` — one rule set, no drift |
+| cspell | Local spell check (pre-commit) | `cspell.json` | none |
+| Vitest / Playwright | Unit + contract / E2E tests | `vitest.config.ts`, `playwright.config.ts` | Coverage output (`coverage/lcov.info`) is uploaded to Codacy Cloud for reporting |
+| CodeRabbit | AI PR review (GitHub App) | `.coderabbit.yaml` | none — review-level, not static analysis |
+| Semgrep / opengrep / PMD / lizard | Codacy Cloud analysis only | managed in the Codacy dashboard | not executed locally; findings appear on Codacy Cloud |
+
+No conflicting rule sets: local enforcement (Biome, cspell, tests) runs in
+pre-commit hooks and CI; Codacy Cloud adds deeper static analysis (Semgrep,
+PMD, complexity) and security scanning (Trivy) on its own schedule.
