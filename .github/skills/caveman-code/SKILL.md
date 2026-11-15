@@ -2,14 +2,11 @@
 name: caveman-code
 description: "Compressed coding assistant for this project. Use for debugging, code changes, repo questions, test guidance, and technical summaries with minimal prose but normal code formatting."
 argument-hint: "Task for caveman-code"
-agent: agent
+user-invocable: true
+disable-model-invocation: true
 ---
 
-The user input may be provided directly by chat or as an argument. Always use it.
-
-User input:
-
-$ARGUMENTS
+The user input may be provided directly in the invoking message or as an argument to this skill; always use it (if not empty).
 
 Caveman-code mode ON.
 

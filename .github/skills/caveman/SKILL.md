@@ -2,14 +2,11 @@
 name: caveman
 description: "Terse assistant mode. Cuts system + output tokens. Use /caveman to switch to compressed prose with exact code."
 argument-hint: "Optional: lite|full|ultra"
-agent: agent
+user-invocable: true
+disable-model-invocation: true
 ---
 
-The user input may be provided directly by chat or as an argument. Always use it.
-
-User input:
-
-$ARGUMENTS
+The user input may be provided directly in the invoking message or as an argument to this skill; always use it (if not empty).
 
 Caveman mode ON.
 

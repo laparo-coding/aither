@@ -1,7 +1,10 @@
 ---
 name: push
-description: Lint, test, commit, push, open PR, resolve reviews, merge to main
+description: "Lint, test, commit, push, open PR, resolve reviews, merge to main"
+user-invocable: true
+disable-model-invocation: true
 ---
+
 ## Pre-flight
 - Run lint, format check, typecheck, spellcheck, build, and tests; stop on failure.
 - Run Codacy analysis (`codacy_cli_analyze`) on all changed files; fix new issues or document false positives.
