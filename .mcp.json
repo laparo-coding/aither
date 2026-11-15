@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "codacy": {
+      "type": "local",
+      "command": "bash",
+      "args": ["/Users/Andreas/GitHub/aither/.vscode/codacy-mcp.sh"],
+      "tools": ["*"]
+    },
+    "context7": {
+      "type": "local",
+      "command": "bash",
+      "args": ["/Users/Andreas/GitHub/aither/.vscode/context7-mcp.sh"],
+      "tools": ["*"]
+    },
+    "playwright": {
+      "type": "local",
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "tools": ["*"]
+    },
+    "rollbar": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@rollbar/mcp-server@latest"],
+      "env": {
+        "ROLLBAR_CONFIG_FILE": "/Users/Andreas/GitHub/aither/.rollbar-mcp.json"
+      },
+      "tools": ["*"]
+    },
+    "clerk": {
+      "type": "http",
+      "url": "https://mcp.clerk.com/mcp",
+      "tools": ["*"]
+    }
+  }
+}
