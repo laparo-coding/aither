@@ -1,5 +1,5 @@
 ---
-name: speckit.specify
+name: speckit-specify
 description: "Create or update the feature specification from a natural language feature description."
 user-invocable: true
 disable-model-invocation: true

@@ -1,5 +1,5 @@
 ---
-name: speckit.implement
+name: speckit-implement
 description: "Execute the implementation plan by processing and executing all tasks defined in tasks.md"
 user-invocable: true
 disable-model-invocation: true
